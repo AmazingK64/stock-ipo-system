@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1890ff; }
+        .info { 
+            background: #e6f7ff; 
+            padding: 10px; 
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ 系统正常运行</h1>
+        <div class="info">
+            <p><strong>服务状态:</strong> 开发服务器已启动</p>
+            <p><strong>访问地址:</strong> <a href="http://localhost:5173">http://localhost:5173</a></p>
+            <p><strong>构建状态:</strong> 编译成功</p>
+        </div>
+        <h2>如果看到白屏,请检查:</h2>
+        <ol>
+            <li>打开浏览器开发者工具(F12)</li>
+            <li>查看Console标签是否有错误信息</li>
+            <li>查看Network标签确认资源加载情况</li>
+            <li>清除浏览器缓存后刷新页面</li>
+        </ol>
+        <div class="info" style="background: #fff7e6;">
+            <p><strong>提示:</strong> 如果问题仍然存在,请将控制台的错误信息发给我</p>
+        </div>
+    </div>
+</body>
+</html>

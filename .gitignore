@@ -1,0 +1,86 @@
+# 依赖
+node_modules/
+.pnp
+.pnp.js
+
+# 测试
+coverage/
+*.lcov
+
+# 构建输出
+dist/
+dist-ssr/
+build/
+*.local
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 数据库文件 (不上传本地数据库)
+*.db
+*.sqlite
+*.sqlite3
+indexedDB/
+.dexie/
+.localforage/
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# 调试
+*.cpuprofile
+*.heapsnapshot
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# 项目特定
+# 本地数据库目录
+.local-data/
+data-backup/
+
+# 敏感信息
+secrets/
+private/
+config.local.json
+credentials.json
+
+# IDE设置
+.idea/
+*.iml
+.vscode/settings.json
