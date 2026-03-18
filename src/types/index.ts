@@ -25,7 +25,27 @@ export interface IPOStock {
   grade: string;
   strategy: IPOStrategy;
   dataDate?: string; // 数据日期(YYYY-MM-DD格式)
+  // A+H股相关
+  hasAShare?: boolean; // 是否有A股
+  aShareCode?: string; // A股代码
+  aSharePrice?: number; // A股价格
+  ahPremium?: number; // A/H溢价率(%)
+  // 历史数据
+  industryHistoryReturn?: number; // 同行业历史平均涨幅
+  similarCompanies?: SimilarCompany[]; // 同类公司历史数据
   createdAt: string;
+}
+
+// 同类公司历史数据
+export interface SimilarCompany {
+  stockCode: string;
+  stockName: string;
+  listingDate: string;
+  industry: string;
+  firstDayReturn: number; // 首日涨幅
+  firstWeekReturn: number; // 首周涨幅
+  firstMonthReturn: number; // 首月涨幅
+  currentReturn: number; // 当前涨幅
 }
 
 // 打新策略接口
