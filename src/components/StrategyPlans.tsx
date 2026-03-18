@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Table, Empty, Badge, Button, Modal, message } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Button, Modal, message } from 'antd';
 import { 
   TrophyOutlined, 
   ThunderboltOutlined, 
   WarningOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   HistoryOutlined,
-  CheckOutlined,
-  LineChartOutlined,
-  DollarOutlined
+  CheckOutlined
 } from '@ant-design/icons';
 import strategyService, { type StrategyPlan } from '../services/strategyService';
-import type { IPOStock, Allocation, SimilarCompany } from '../types';
+import type { IPOStock, SimilarCompany } from '../types';
 
 const { Text } = Typography;
 
@@ -226,280 +223,155 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
           <Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A级及以上且仍在申购期)</Text>
         </Space>
       }
-      style={{ marginBottom: 24 }}
+      style={{ marginBottom: 32 }}
     >
-      {/* 方案选择器 */}
-      <Card style={{ marginBottom: 16, background: '#f0f2f5' }}>
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <Text strong style={{ fontSize: 16 }}>选择方案:</Text>
-          <Space wrap size="middle">
-            {plans.map((plan, index) => (
-              <Button
-                key={index}
-                type={selectedPlanIndex === index ? 'primary' : 'default'}
-                size="large"
-                onClick={() => handlePlanSelect(index)}
-                style={{
-                  height: 'auto',
-                  padding: '12px 24px',
-                  borderRadius: 8,
-                  border: selectedPlanIndex === index ? `2px solid ${getRankColor(plan.rank)}` : `1px solid #d9d9d9`,
-                  background: selectedPlanIndex === index ? getRankColor(plan.rank) : '#fff',
-                  color: selectedPlanIndex === index ? '#fff' : '#333',
-                  fontWeight: selectedPlanIndex === index ? 'bold' : 'normal',
-                  boxShadow: selectedPlanIndex === index ? `0 4px 12px ${getRankColor(plan.rank)}40` : 'none',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <Space direction="vertical" size={0} align="center">
-                  <Space>
-                    {getRankIcon(plan.rank)}
-                    <span style={{ fontSize: 16 }}>{plan.rank}</span>
+      {plans.length === 0 ? (
+        <Empty description="暂无符合条件的A级及以上新股，或已过申购截止日期" />
+      ) : (
+        <>
+          {/* 横向紧凑的三个方案 */}
+          <Row gutter={[16, 16]}>
+            {plans.map((plan, planIndex) => (
+              <Col xs={24} md={8} key={planIndex}>
+                <Card
+                  hoverable
+                  onClick={() => handlePlanSelect(planIndex)}
+                  style={{
+                    height: '100%',
+                    border: selectedPlanIndex === planIndex ? `3px solid ${getRankColor(plan.rank)}` : `1px solid #d9d9d9`,
+                    borderRadius: 12,
+                    background: selectedPlanIndex === planIndex ? '#fffbe6' : '#fff',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  bodyStyle={{ padding: 16 }}
+                >
+                  {/* 方案标题 */}
+                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <Space direction="vertical" size={4}>
+                      {getRankIcon(plan.rank)}
+                      <Text strong style={{ fontSize: 16, color: getRankColor(plan.rank) }}>
+                        {plan.rank}
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {plan.combinations.map(ipo => ipo.stockName).join(' + ')}
+                      </Text>
+                    </Space>
+                  </div>
+
+                  <Divider style={{ margin: '12px 0' }} />
+
+                  {/* 核心指标 */}
+                  <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                    <Row gutter={8}>
+                      <Col span={12}>
+                        <Statistic
+                          title={<Text type="secondary" style={{ fontSize: 11 }}>自有资金</Text>}
+                          value={plan.totalCapital}
+                          precision={0}
+                          prefix="HK$"
+                          valueStyle={{ fontSize: 14, color: '#1890ff' }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Statistic
+                          title={<Text type="secondary" style={{ fontSize: 11 }}>收益率</Text>}
+                          value={plan.returnRate * 100}
+                          precision={1}
+                          suffix="%"
+                          valueStyle={{ fontSize: 14, color: '#52c41a', fontWeight: 'bold' }}
+                        />
+                      </Col>
+                    </Row>
+
+                    <Row gutter={8}>
+                      <Col span={12}>
+                        <Statistic
+                          title={<Text type="secondary" style={{ fontSize: 11 }}>净收益</Text>}
+                          value={plan.netReturn}
+                          precision={0}
+                          prefix="HK$"
+                          valueStyle={{ fontSize: 14, color: '#52c41a' }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>风险等级</Text>
+                          <div>
+                            <Tag color={getRiskColor(plan.riskLevel)} style={{ marginTop: 4 }}>
+                              {plan.riskLevel}
+                            </Tag>
+                          </div>
+                        </div>
+                      </Col>
+                    </Row>
+
+                    {/* 快速查看中签率 */}
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 11 }}>中签率</Text>
+                      <div style={{ marginTop: 4 }}>
+                        {plan.winProbability.details.slice(0, 2).map((detail, idx) => (
+                          <Tag key={idx} style={{ marginBottom: 4, fontSize: 11 }}>
+                            {detail.stockName}: {(detail.estimatedWinRate * 100).toFixed(1)}%
+                          </Tag>
+                        ))}
+                        {plan.winProbability.details.length > 2 && (
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            +{plan.winProbability.details.length - 2}只
+                          </Text>
+                        )}
+                      </div>
+                    </div>
                   </Space>
-                  <Tag 
-                    color={selectedPlanIndex === index ? 'gold' : getRankColor(plan.rank)}
-                    style={{ marginTop: 4 }}
-                  >
-                    收益率 {(plan.returnRate * 100).toFixed(1)}%
-                  </Tag>
-                </Space>
-              </Button>
-            ))}
-          </Space>
-          <Button 
-            type="primary" 
-            icon={<CheckOutlined />} 
-            onClick={handleConfirmPlan} 
-            disabled={plans.length === 0}
-            size="large"
-            style={{
-              width: '100%',
-              height: 48,
-              fontSize: 16,
-              fontWeight: 'bold',
-              background: plans.length > 0 ? getRankColor(plans[selectedPlanIndex]?.rank || '最优方案') : undefined,
-              border: 'none'
-            }}
-          >
-            ✓ 确认选择此方案
-          </Button>
-        </Space>
-      </Card>
 
-      {/* 展示三个方案 */}
-      {plans.map((plan, planIndex) => (
-        <Card
-          key={planIndex}
-          style={{
-            marginBottom: 24,
-            border: selectedPlanIndex === planIndex ? `3px solid ${getRankColor(plan.rank)}` : `2px solid ${getRankColor(plan.rank)}`,
-            borderRadius: 12,
-            position: 'relative',
-            background: selectedPlanIndex === planIndex ? '#fffbe6' : '#fff'
-          }}
-          extra={
-            selectedPlanIndex === planIndex && (
-              <Tag color="gold" icon={<CheckOutlined />}>已选择</Tag>
-            )
-          }
-          title={
-            <Space>
-              {getRankIcon(plan.rank)}
-              <Text strong style={{ fontSize: 16, color: getRankColor(plan.rank) }}>
-                {plan.rank}
-              </Text>
-              <Badge count={plan.combinations.length} style={{ backgroundColor: getRankColor(plan.rank) }} showZero={false} />
-              <Text type="secondary">({plan.combinations.map(ipo => ipo.stockName).join(' + ')})</Text>
-            </Space>
-          }
-        >
-          {/* 核心指标 */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title="自有资金" value={plan.totalCapital} precision={2} prefix="HK$" valueStyle={{ color: '#1890ff', fontSize: 18 }} />
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title="总融资额" value={plan.totalFinancing} precision={2} prefix="HK$" valueStyle={{ color: '#722ed1', fontSize: 18 }} />
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title="预期净收益" value={plan.netReturn} precision={2} prefix="HK$" valueStyle={{ color: '#52c41a', fontSize: 18, fontWeight: 'bold' }} />
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title="收益率" value={plan.returnRate * 100} precision={2} suffix="%" valueStyle={{ color: '#52c41a', fontSize: 18, fontWeight: 'bold' }} />
-            </Col>
+                  {/* 选中标识 */}
+                  {selectedPlanIndex === planIndex && (
+                    <div style={{ marginTop: 12, textAlign: 'center' }}>
+                      <Tag color="gold" icon={<CheckOutlined />}>已选择</Tag>
+                    </div>
+                  )}
+                </Card>
+              </Col>
+            ))}
           </Row>
 
-          <Divider />
+          {/* 确认按钮 */}
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <Button 
+              type="primary" 
+              size="large"
+              icon={<CheckOutlined />} 
+              onClick={handleConfirmPlan}
+              style={{
+                width: 200,
+                height: 48,
+                fontSize: 16,
+                fontWeight: 'bold',
+                background: getRankColor(plans[selectedPlanIndex]?.rank || '最优方案'),
+                border: 'none'
+              }}
+            >
+              确认选择此方案
+            </Button>
+          </div>
 
-          {/* 同行业历史表现 */}
-          {plan.combinations.some(ipo => ipo.similarCompanies && ipo.similarCompanies.length > 0) && (
-            <>
-              <Card style={{ marginBottom: 20, background: '#e6f7ff', border: '1px solid #91d5ff' }}>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Text strong style={{ color: '#0050b3', fontSize: 16 }}>
-                    <HistoryOutlined style={{ marginRight: 8 }} />
-                    同行业历史表现参考
-                  </Text>
-                  <Row gutter={[16, 8]}>
-                    {plan.combinations.map(ipo => (
-                      ipo.similarCompanies && ipo.similarCompanies.length > 0 && (
-                        <Col xs={24} sm={12} md={8} key={ipo.stockCode}>
-                          <Card size="small" style={{ background: '#fff' }}>
-                            <Space direction="vertical" style={{ width: '100%' }}>
-                              <Space>
-                                <Tag color="blue">{ipo.stockName}</Tag>
-                                <Button size="small" icon={<LineChartOutlined />} onClick={() => showHistoryModal(ipo)}>
-                                  查看详情
-                                </Button>
-                              </Space>
-                              <Space size="large">
-                                <div>
-                                  <Text type="secondary" style={{ fontSize: 11 }}>首日平均涨幅</Text>
-                                  <div>
-                                    <Text strong style={{ color: ipo.industryHistoryReturn && ipo.industryHistoryReturn > 0 ? '#52c41a' : '#ff4d4f' }}>
-                                      {ipo.industryHistoryReturn ? `${(ipo.industryHistoryReturn * 100).toFixed(1)}%` : '暂无数据'}
-                                    </Text>
-                                  </div>
-                                </div>
-                              </Space>
-                              {ipo.hasAShare && (
-                                <Tag color="orange">A+H股</Tag>
-                              )}
-                            </Space>
-                          </Card>
-                        </Col>
-                      )
-                    ))}
-                  </Row>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    * 历史数据仅供参考，不代表未来表现
-                  </Text>
-                </Space>
-              </Card>
-              <Divider />
-            </>
-          )}
-
-          {/* 中签概率分析 */}
-          <Card style={{ marginBottom: 20, background: '#f6ffed', border: '1px solid #b7eb8f' }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
-                <CheckCircleOutlined style={{ marginRight: 8 }} />
-                中签概率分析
-              </Text>
-              <Row gutter={[16, 8]}>
-                {plan.winProbability.details.map((detail, idx) => (
-                  <Col xs={24} sm={12} md={8} key={idx}>
-                    <Card size="small" style={{ background: '#fff', border: '1px solid #d9f7be' }}>
-                      <Space direction="vertical" style={{ width: '100%' }}>
-                        <Space wrap>
-                          <Tag color="blue">{detail.stockName}</Tag>
-                          <Tag color={detail.groupType === '甲组' ? 'green' : 'orange'}>{detail.groupType}</Tag>
-                          {detail.financingMultiplier > 1 && <Tag color="purple">{detail.financingMultiplier}x孖展</Tag>}
-                        </Space>
-                        
-                        <Space wrap>
-                          {detail.isLeader && <Tag color="gold" icon={<TrophyOutlined />}>行业龙头</Tag>}
-                          {detail.hasGreenshoe && <Tag color="cyan">绿鞋机制</Tag>}
-                          {detail.industryScore >= 12 && <Tag color="volcano">热门赛道</Tag>}
-                        </Space>
-                        
-                        <Divider style={{ margin: '8px 0' }} />
-                        
-                        <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                          <Text type="secondary" style={{ fontSize: 12 }}>申购手数: <Text strong>{detail.subscriptionLots}手</Text></Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>申购金额: HK${detail.subscriptionAmount.toFixed(0)}</Text>
-                          
-                          <Divider style={{ margin: '8px 0' }} />
-                          
-                          {detail.groupType === '甲组' && (
-                            <>
-                              <Text strong style={{ color: '#722ed1', fontSize: 13 }}>
-                                一手党中签率: {(detail.oneHandPartyRate * 100).toFixed(1)}%
-                              </Text>
-                              <Text type="secondary" style={{ fontSize: 11 }}>(申购1手的散户中签概率)</Text>
-                            </>
-                          )}
-                          
-                          <Text strong style={{ color: '#52c41a' }}>一手中签率: {(detail.oneHandWinRate * 100).toFixed(1)}%</Text>
-                          <Text style={{ color: '#1890ff', fontWeight: 'bold' }}>综合中签率: {(detail.estimatedWinRate * 100).toFixed(1)}%</Text>
-                          
-                          <Divider style={{ margin: '8px 0' }} />
-                          
-                          <Text type="secondary" style={{ fontSize: 12 }}>预期中签:</Text>
-                          <Text strong style={{ fontSize: 14 }}>{detail.expectedLots}手 ({detail.expectedShares.toLocaleString()}股)</Text>
-                        </Space>
-                      </Space>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-              <Space direction="vertical" size={0} style={{ width: '100%', marginTop: 8 }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>* 中签率基于认购倍数、甲/乙组分配规则、绿鞋红鞋机制、一手党保护等因素估算</Text>
-                <Text type="warning" style={{ fontSize: 12 }}>⚠️ 孖展倍数越高,竞争越激烈,实际中签手数可能远低于申购手数</Text>
-                <Text type="success" style={{ fontSize: 12 }}>✅ 绿鞋机制: 上市30天内价格稳定,破发风险低,中签价值更高</Text>
-              </Space>
-            </Space>
-          </Card>
-
-          <Divider />
-
-          {/* 成本分析 */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title={<><ClockCircleOutlined /> 机会成本</>} value={plan.costs.opportunityCost} precision={2} prefix="HK$" valueStyle={{ color: '#faad14', fontSize: 14 }} />
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title={<><DollarOutlined /> 融资费用</>} value={plan.costs.financingFee} precision={2} prefix="HK$" valueStyle={{ color: '#faad14', fontSize: 14 }} />
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title={<><WarningOutlined /> 交易费用</>} value={plan.costs.tradingFee} precision={2} prefix="HK$" valueStyle={{ color: '#faad14', fontSize: 14 }} />
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Statistic title="总成本" value={plan.costs.totalCost} precision={2} prefix="HK$" valueStyle={{ color: '#ff4d4f', fontSize: 14, fontWeight: 'bold' }} />
-            </Col>
-          </Row>
-
-          <Divider />
-
-          {/* 风险等级 */}
-          <Space style={{ marginBottom: 16 }}>
-            <Text strong>风险等级:</Text>
-            <Tag color={getRiskColor(plan.riskLevel)} style={{ fontSize: 14, padding: '4px 12px' }}>{plan.riskLevel}</Tag>
-            <Divider type="vertical" />
-            <Text strong>预期收益:</Text>
-            <Text type="success" strong>{strategyService.formatMoney(plan.expectedReturn)}</Text>
-          </Space>
-
-          {/* 分配详情表格 */}
-          <Table columns={columns} dataSource={plan.allocations} rowKey="stockCode" pagination={false} scroll={{ x: 800 }} size="small" 
-            summary={() => (
-              <Table.Summary fixed>
-                <Table.Summary.Row>
-                  <Table.Summary.Cell index={0} colSpan={2}><Text strong>合计</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={2}>
-                    <Text strong style={{ color: '#1890ff' }}>{strategyService.formatMoney(plan.totalCapital)}</Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={3} />
-                  <Table.Summary.Cell index={4}>
-                    <Text strong style={{ color: '#52c41a' }}>{strategyService.formatMoney(plan.totalSubscription)}</Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} />
-                </Table.Summary.Row>
-              </Table.Summary>
-            )}
-          />
-
-          {/* 保荐人信息 */}
-          <Divider />
-          <Space wrap>
-            <Text strong>保荐人信息:</Text>
-            {plan.combinations.map(ipo => (
-              <Tag key={ipo.stockCode} color="blue">{ipo.stockName} - {ipo.underwriter}</Tag>
-            ))}
-          </Space>
-        </Card>
-      ))}
+          {/* 展开详情按钮 */}
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <Button 
+              type="link"
+              onClick={() => {
+                const plan = plans[selectedPlanIndex];
+                if (plan) {
+                  setSelectedStock(plan.combinations[0]);
+                  setHistoryModalVisible(true);
+                }
+              }}
+            >
+              查看选中方案详细数据 →
+            </Button>
+          </div>
+        </>
+      )}
 
       {/* 历史数据模态框 */}
       <Modal
