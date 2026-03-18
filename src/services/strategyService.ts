@@ -534,17 +534,15 @@ class StrategyService {
    */
   filterAGradeOrAbove(ipoStocks: IPOStock[]): IPOStock[] {
     const now = new Date();
-    now.setHours(23, 59, 59, 999); // 设置到当天结束
     
     return ipoStocks.filter(ipo => {
       const adjustedScore = this.recalculateScoreWithUnderwriter(ipo);
       // A-及以上等级(评分>=70)
       const isAGrade = adjustedScore >= 70 || ipo.grade === 'A+' || ipo.grade === 'A';
       
-      // 检查申购是否已截止
+      // 检查申购是否已截止（支持精确到小时的时间判断）
       const subscriptionEnd = new Date(ipo.subscriptionEndDate);
-      subscriptionEnd.setHours(23, 59, 59, 999);
-      const isStillSubscribing = subscriptionEnd >= now;
+      const isStillSubscribing = subscriptionEnd > now;
       
       return isAGrade && isStillSubscribing;
     });
