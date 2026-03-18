@@ -227,15 +227,83 @@ expectedLots = expectedLotsFromRate × 0.7 + 保底机制 × 0.3
 
 ---
 
+## 🌿 分支管理
+
+本项目采用Git Flow工作流程：
+
+### 分支说明
+
+| 分支类型 | 分支名称 | 说明 |
+|---------|---------|------|
+| 主分支 | `main` | 稳定的生产版本，只接受经过测试的代码 |
+| 迭代分支 | `develop` | 日常功能迭代开发，默认开发分支 |
+| 功能分支 | `feature/xxx` | 具体功能开发，从develop创建 |
+
+### 工作流程
+
+#### 1. 日常开发（在develop分支）
+
+```bash
+# 确保在develop分支
+git checkout develop
+
+# 拉取最新代码
+git pull
+
+# 进行代码修改后提交
+git add .
+git commit -m "✨ 新增功能描述"
+
+# 推送到远程
+git push
+```
+
+#### 2. 功能稳定后合并到main
+
+```bash
+# 切换到main分支
+git checkout main
+
+# 拉取最新代码
+git pull
+
+# 合并develop分支
+git merge develop
+
+# 推送到远程
+git push
+
+# 切回develop继续开发
+git checkout develop
+```
+
+#### 3. 大功能开发（创建feature分支）
+
+```bash
+# 从develop创建功能分支
+git checkout develop
+git checkout -b feature/real-time-scraper
+
+# 开发完成后合并回develop
+git checkout develop
+git merge feature/real-time-scraper
+
+# 删除功能分支（可选）
+git branch -d feature/real-time-scraper
+```
+
+---
+
 ## 🤝 参与贡献
 
 虽然这是一个AI生成的项目，但欢迎社区贡献！
 
 1. Fork 本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+2. 切换到develop分支 (`git checkout develop`)
+3. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+4. 提交更改 (`git commit -m '✨ Add some AmazingFeature'`)
+5. 推送到分支 (`git push origin feature/AmazingFeature`)
+6. 提交 Pull Request 到 develop 分支
 
 ---
 
