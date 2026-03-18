@@ -83,7 +83,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/stock-ipo-system.git
+git clone https://github.com/AmazingK64/stock-ipo-system.git
 
 # 进入项目目录
 cd stock-ipo-system
@@ -256,8 +256,8 @@ expectedLots = expectedLotsFromRate × 0.7 + 保底机制 × 0.3
 
 ## 📞 联系方式
 
-- 项目地址: [GitHub](https://github.com/yourusername/stock-ipo-system)
-- 问题反馈: [Issues](https://github.com/yourusername/stock-ipo-system/issues)
+- 项目地址: [GitHub](https://github.com/AmazingK64/stock-ipo-system)
+- 问题反馈: [Issues](https://github.com/AmazingK64/stock-ipo-system/issues)
 
 ---
 
