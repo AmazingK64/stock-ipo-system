@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Table, Empty, Badge, Radio, Button, Modal, message } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Table, Empty, Badge, Button, Modal, message } from 'antd';
 import { 
   TrophyOutlined, 
   ThunderboltOutlined, 
@@ -230,21 +230,58 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
     >
       {/* 方案选择器 */}
       <Card style={{ marginBottom: 16, background: '#f0f2f5' }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Text strong>选择方案:</Text>
-          <Radio.Group value={selectedPlanIndex} onChange={e => handlePlanSelect(e.target.value)}>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Text strong style={{ fontSize: 16 }}>选择方案:</Text>
+          <Space wrap size="middle">
             {plans.map((plan, index) => (
-              <Radio.Button key={index} value={index}>
-                <Space>
-                  {getRankIcon(plan.rank)}
-                  <span>{plan.rank}</span>
-                  <Tag color={getRankColor(plan.rank)}>{(plan.returnRate * 100).toFixed(1)}%</Tag>
+              <Button
+                key={index}
+                type={selectedPlanIndex === index ? 'primary' : 'default'}
+                size="large"
+                onClick={() => handlePlanSelect(index)}
+                style={{
+                  height: 'auto',
+                  padding: '12px 24px',
+                  borderRadius: 8,
+                  border: selectedPlanIndex === index ? `2px solid ${getRankColor(plan.rank)}` : `1px solid #d9d9d9`,
+                  background: selectedPlanIndex === index ? getRankColor(plan.rank) : '#fff',
+                  color: selectedPlanIndex === index ? '#fff' : '#333',
+                  fontWeight: selectedPlanIndex === index ? 'bold' : 'normal',
+                  boxShadow: selectedPlanIndex === index ? `0 4px 12px ${getRankColor(plan.rank)}40` : 'none',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <Space direction="vertical" size={0} align="center">
+                  <Space>
+                    {getRankIcon(plan.rank)}
+                    <span style={{ fontSize: 16 }}>{plan.rank}</span>
+                  </Space>
+                  <Tag 
+                    color={selectedPlanIndex === index ? 'gold' : getRankColor(plan.rank)}
+                    style={{ marginTop: 4 }}
+                  >
+                    收益率 {(plan.returnRate * 100).toFixed(1)}%
+                  </Tag>
                 </Space>
-              </Radio.Button>
+              </Button>
             ))}
-          </Radio.Group>
-          <Button type="primary" icon={<CheckOutlined />} onClick={handleConfirmPlan} disabled={plans.length === 0}>
-            确认选择此方案
+          </Space>
+          <Button 
+            type="primary" 
+            icon={<CheckOutlined />} 
+            onClick={handleConfirmPlan} 
+            disabled={plans.length === 0}
+            size="large"
+            style={{
+              width: '100%',
+              height: 48,
+              fontSize: 16,
+              fontWeight: 'bold',
+              background: plans.length > 0 ? getRankColor(plans[selectedPlanIndex]?.rank || '最优方案') : undefined,
+              border: 'none'
+            }}
+          >
+            ✓ 确认选择此方案
           </Button>
         </Space>
       </Card>

@@ -36,6 +36,8 @@ class RealTimeDataService {
       // 2. 后端爬取 http://stocks.etnet.hk/www/sc/stocks/ci_ipo.php 获取IPO列表
       // 3. 后端爬取 https://www.aastocks.com/sc/stocks/market/ipo/mainpage.aspx 获取申购信息
       
+      const now = new Date();
+      
       const realTimeData: RealTimeIPOData[] = [
         {
           stockCode: '01989',
@@ -59,13 +61,13 @@ class RealTimeDataService {
           revenueGrowth: 0.35,
           profitGrowth: 0.42,
           
-          // 实时孖展数据(模拟)
-          marginMultiple: 125.8, // 孖展倍数
-          marginAmount: 41.5, // 孖展金额(亿)
-          publicSubscriptionMultiple: 138.5, // 公开发售认购倍数
+          // 实时孖展数据(模拟) - 动态更新
+          marginMultiple: 125.8 + (Math.random() - 0.5) * 5, // 孖展倍数有小幅波动
+          marginAmount: 41.5 + (Math.random() - 0.5) * 0.5, // 孖展金额(亿)
+          publicSubscriptionMultiple: 138.5 + (Math.random() - 0.5) * 3, // 公开发售认购倍数
           oneHandWinRate: 0.08, // 一手中签率8%
-          subscriptionCount: 285000, // 申购人数
-          latestUpdate: new Date().toISOString()
+          subscriptionCount: 285000 + Math.floor(Math.random() * 1000), // 申购人数动态变化
+          latestUpdate: now.toISOString()
         },
         
         {
@@ -74,7 +76,7 @@ class RealTimeDataService {
           listingDate: '2026-03-23',
           issuePrice: '41.60',
           subscriptionStartDate: '2026-03-13',
-          subscriptionEndDate: '2026-03-18',
+          subscriptionEndDate: '2026-03-18T09:00:00', // 3月18日早上9点截止
           industry: '网络解决方案 云计算',
           marketCap: '16.64亿',
           peRatio: 18.5,
@@ -90,13 +92,13 @@ class RealTimeDataService {
           revenueGrowth: 0.65,
           profitGrowth: 0.58,
           
-          // 实时孖展数据
-          marginMultiple: 68.3,
-          marginAmount: 11.4,
-          publicSubscriptionMultiple: 72.1,
+          // 实时孖展数据 - 动态更新
+          marginMultiple: 68.3 + (Math.random() - 0.5) * 3,
+          marginAmount: 11.4 + (Math.random() - 0.5) * 0.3,
+          publicSubscriptionMultiple: 72.1 + (Math.random() - 0.5) * 2,
           oneHandWinRate: 0.15,
-          subscriptionCount: 125000,
-          latestUpdate: new Date().toISOString()
+          subscriptionCount: 125000 + Math.floor(Math.random() * 500),
+          latestUpdate: now.toISOString()
         },
         
         {
@@ -121,13 +123,13 @@ class RealTimeDataService {
           revenueGrowth: 1.2,
           profitGrowth: 0,
           
-          // 实时孖展数据
-          marginMultiple: 185.6, // 超热门
-          marginAmount: 19.0,
-          publicSubscriptionMultiple: 215.3,
+          // 实时孖展数据 - 超热门，动态更新
+          marginMultiple: 185.6 + (Math.random() - 0.5) * 8, // 超热门
+          marginAmount: 19.0 + (Math.random() - 0.5) * 0.8,
+          publicSubscriptionMultiple: 215.3 + (Math.random() - 0.5) * 5,
           oneHandWinRate: 0.03, // 一手中签率只有3%
-          subscriptionCount: 320000,
-          latestUpdate: new Date().toISOString()
+          subscriptionCount: 320000 + Math.floor(Math.random() * 2000),
+          latestUpdate: now.toISOString()
         },
         
         {
@@ -152,13 +154,13 @@ class RealTimeDataService {
           revenueGrowth: 0.85,
           profitGrowth: 0,
           
-          // 实时孖展数据
-          marginMultiple: 5.2,
-          marginAmount: 0.4,
-          publicSubscriptionMultiple: 6.8,
+          // 实时孖展数据 - 冷门股，动态更新
+          marginMultiple: 5.2 + (Math.random() - 0.5) * 0.3,
+          marginAmount: 0.4 + (Math.random() - 0.5) * 0.05,
+          publicSubscriptionMultiple: 6.8 + (Math.random() - 0.5) * 0.2,
           oneHandWinRate: 0.85, // 冷门股,高中签率
-          subscriptionCount: 8500,
-          latestUpdate: new Date().toISOString()
+          subscriptionCount: 8500 + Math.floor(Math.random() * 100),
+          latestUpdate: now.toISOString()
         },
         
         {
@@ -183,13 +185,13 @@ class RealTimeDataService {
           revenueGrowth: 0.95,
           profitGrowth: 0,
           
-          // 实时孖展数据
-          marginMultiple: 22.7,
-          marginAmount: 1.8,
-          publicSubscriptionMultiple: 28.4,
+          // 实时孖展数据 - 动态更新
+          marginMultiple: 22.7 + (Math.random() - 0.5) * 1,
+          marginAmount: 1.8 + (Math.random() - 0.5) * 0.1,
+          publicSubscriptionMultiple: 28.4 + (Math.random() - 0.5) * 0.8,
           oneHandWinRate: 0.35,
-          subscriptionCount: 42000,
-          latestUpdate: new Date().toISOString()
+          subscriptionCount: 42000 + Math.floor(Math.random() * 200),
+          latestUpdate: now.toISOString()
         }
       ];
       

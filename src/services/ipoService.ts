@@ -42,7 +42,7 @@ class IPOService {
           listingDate: '2026-03-23',
           issuePrice: '41.60',
           subscriptionStartDate: '2026-03-13',
-          subscriptionEndDate: '2026-03-18',
+          subscriptionEndDate: '2026-03-18T09:00:00', // 3月18日早上9点截止
           industry: '网络解决方案 云计算',
           marketCap: '16.64亿',
           peRatio: 18.5,
