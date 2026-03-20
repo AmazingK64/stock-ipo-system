@@ -17,6 +17,7 @@ const aastocksScraper = require('./scraper/aastocks-scraper');
 const prospectusScraper = require('./scraper/prospectus-scraper');
 const dataProvider = require('./dataProvider');
 const prospectusDownloader = require('./scraper/hkex-prospectus-downloader');
+const webSearchService = require('./scraper/web-search-service');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -229,6 +230,21 @@ app.get('/api/subscribe-list', async (req, res) => {
                 totalLots: prospectusData.totalLots || ipo.totalLots,
                 publicSharesRatio: prospectusData.publicSharesRatio || ipo.publicSharesRatio,
                 description: prospectusData.description || ipo.description,
+                // 新增评分维度字段
+                hasAShare: prospectusData.hasAShare || ipo.hasAShare,
+                aShareCode: prospectusData.aShareCode || ipo.aShareCode,
+                aSharePrice: prospectusData.aSharePrice || ipo.aSharePrice,
+                ahDiscount: prospectusData.ahDiscount || ipo.ahDiscount,
+                businessModel: prospectusData.businessModel || ipo.businessModel,
+                moatLevel: prospectusData.moatLevel || ipo.moatLevel,
+                valuationLevel: prospectusData.valuationLevel || ipo.valuationLevel,
+                pbRatio: prospectusData.pbRatio || ipo.pbRatio,
+                peerPeAvg: prospectusData.peerPeAvg || ipo.peerPeAvg,
+                peerPbAvg: prospectusData.peerPbAvg || ipo.peerPbAvg,
+                businessModelReason: prospectusData.businessModelReason || ipo.businessModelReason,
+                moatReason: prospectusData.moatReason || ipo.moatReason,
+                valuationReason: prospectusData.valuationReason || ipo.valuationReason,
+                lastRoundValuation: prospectusData.lastRoundValuation || ipo.lastRoundValuation,
               };
             }
             return ipo;
@@ -463,6 +479,79 @@ app.get('/api/prospectus/list', async (req, res) => {
     });
   } catch (error) {
     console.error('[API] 获取招股书列表失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 手动触发网络搜索补充评分数据
+ * POST /api/scoring/enrich
+ * Body: { stockCode?: string } — 不传则搜索所有缺少评分数据的股票
+ */
+app.post('/api/scoring/enrich', async (req, res) => {
+  try {
+    const { stockCode } = req.body;
+    console.log('[API] 开始网络搜索补充评分数据...', stockCode ? `指定: ${stockCode}` : '全部');
+
+    if (stockCode) {
+      // 搜索指定股票
+      const data = await dataProvider.getAllData();
+      const allIPOs = [...(data.subscribeIPOs || []), ...(data.upcomingIPOs || [])];
+      const target = allIPOs.find(ipo => ipo.stockCode === stockCode);
+
+      if (!target) {
+        return res.status(404).json({
+          success: false,
+          error: `未找到股票 ${stockCode}`
+        });
+      }
+
+      const result = await webSearchService.searchIPOAnalysis(
+        target.stockCode,
+        target.stockName,
+        target
+      );
+
+      return res.json({
+        success: true,
+        stockCode,
+        stockName: target.stockName,
+        data: result
+      });
+    } else {
+      // 搜索所有缺少评分数据的股票
+      const data = await dataProvider.getAllData();
+      const allIPOs = [...(data.subscribeIPOs || []), ...(data.upcomingIPOs || [])];
+      const needsEnrich = allIPOs.filter(ipo => webSearchService.needsSearch(ipo));
+
+      console.log(`[API] 需要搜索补充的股票: ${needsEnrich.length} 只`);
+
+      const results = [];
+      for (const ipo of needsEnrich) {
+        const result = await webSearchService.searchIPOAnalysis(
+          ipo.stockCode,
+          ipo.stockName,
+          ipo
+        );
+        if (result) {
+          results.push({ stockCode: ipo.stockCode, stockName: ipo.stockName, ...result });
+        }
+        // 搜索间隔
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      return res.json({
+        success: true,
+        total: needsEnrich.length,
+        enriched: results.length,
+        data: results
+      });
+    }
+  } catch (error) {
+    console.error('[API] 网络搜索补充失败:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -930,6 +1019,7 @@ async function startServer() {
 ║   • GET /api/today-listed    - 获取今日上市实时行情        ║
 ║   • POST /api/prospectus/update - 更新招股书库(下载+清理) ║
 ║   • GET  /api/prospectus/list   - 获取本地招股书列表       ║
+║   • POST /api/scoring/enrich    - 网络搜索补充评分数据     ║
 ║   • GET /prospectus/{file}  - 下载招股书PDF              ║
 ║   • GET /api/cached-data     - 获取缓存数据                ║
 ║   • GET /api/health          - 健康检查                   ║

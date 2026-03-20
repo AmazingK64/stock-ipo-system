@@ -78,7 +78,7 @@ const TextDanger: React.FC<{ children: React.ReactNode; style?: React.CSSPropert
 
 /** 获取评分详情 */
 export const getScoreDetails = (record: IPOStock): {
-  items: Array<{ label: string; value: number; description: string }>;
+  items: Array<{ label: string; value: number; maxScore: number; description: string }>;
   total: number;
 } => {
   // 委托给评分服务
@@ -121,9 +121,9 @@ export const ScoreDetailModal: React.FC<{
           <Space direction="vertical" style={{ width: '100%' }} size="small">
             {items.map((item, index) => (
               <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Text strong style={{ width: 60, flexShrink: 0 }}>{item.label}</Text>
+                <Text strong style={{ width: 72, flexShrink: 0 }}>{item.label}</Text>
                 <Tag color="blue" style={{ flexShrink: 0 }}>
-                  +{item.value}分
+                  +{item.value}/{item.maxScore}分
                 </Tag>
                 <TextSecondary style={{ fontSize: 12, flex: 1 }}>{item.description}</TextSecondary>
               </div>
@@ -153,13 +153,16 @@ export const ScoreDetailModal: React.FC<{
           styles={{ body: { padding: '12px 16px', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' } }}
         >
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Text type="secondary" style={{ fontSize: 11, marginBottom: 4, display: 'block' }}>
+              评分维度: 行业热度(30) + 保荐人(18) + 投资者(16) + 商业模式(17) + 估值(10) + 绿鞋(5) + AH折价(2) + 盈利(2)
+            </Text>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>92分以上</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>80分以上</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                顶级优质标的。行业地位领先，市场认可度高；顶级保荐人(中金/中信/摩根士丹利等)；明星投资者加持；估值合理或偏低。
+                顶级优质标的。行业领先且风口明确；顶级保荐人+知名基石加持；商业模式清晰，护城河宽；估值便宜或合理。
               </Text>
               <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：可融资申购，积极参与
@@ -169,10 +172,10 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>87-91分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>72-79分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                优质标的。行业前景良好，具有一定竞争力；知名保荐人；有基石投资者；估值处于合理区间。
+                优质标的。行业前景良好，有一定竞争力；知名保荐人；有基石投资者；商业模式清晰，估值合理。
               </Text>
               <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：可融资申购，建议参与
@@ -182,10 +185,10 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>82-86分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>65-71分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                良好标的。行业有一定的成长空间；有保荐人支持，可能有基石投资者；估值相对合理，无明显泡沫。
+                良好标的。行业有一定成长空间；有保荐人支持；商业模式较清晰，护城河中等；估值相对合理。
               </Text>
               <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：可适度参与，优先现金申购
@@ -195,10 +198,10 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>77-81分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>58-64分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中上水平。行业前景尚可，但竞争格局一般；保荐人资质普通；投资者参与度有限；估值略高。
+                中上水平。行业前景尚可；保荐人资质普通；商业模式一般，护城河窄；估值略高。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
                 建议：谨慎参与，优先现金申购
@@ -208,10 +211,10 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>62-76分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>48-57分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中等水平。行业发展空间有限，市场竞争较激烈；保荐人资质一般；估值相对较高。
+                中等水平。行业竞争较激烈；保荐人资质一般；商业模式不突出；估值偏高。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
                 建议：少量参与或不参与
@@ -221,7 +224,7 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>52-61分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>38-47分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
                 中下水平。行业前景不明朗；缺乏明显竞争优势；保荐人实力有限；估值偏高。
@@ -234,7 +237,7 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>42-51分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>28-37分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
                 较差标的。行业前景欠佳；缺乏核心竞争力；保荐人资质较差；估值明显偏高。
@@ -247,7 +250,7 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>32-41分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>18-27分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
                 差标的。行业前景黯淡；竞争力薄弱；保荐人实力不足；估值显著偏高。
@@ -260,7 +263,7 @@ export const ScoreDetailModal: React.FC<{
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>32分以下</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>18分以下</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
                 风险极高。基本面较差或信息不充分。

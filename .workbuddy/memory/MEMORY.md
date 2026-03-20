@@ -61,6 +61,28 @@ IPOList组件已拆分为三个文件:
   - B类生物医药(亏损): 管线价值未体现,给18分
   - 传统行业大市值(家电/空调等>50亿): 市值评分降档,涨幅预期有限
 
+### 评分体系
+- 满分100分，8个维度: 行业热度(30)+保荐人(18)+投资者(16)+商业模式(17)+估值(10)+绿鞋(5)+AH折价(2)+盈利(2)
+- 行业热度: AI/半导体等风口30分，传统行业8分，其他12分
+- 保荐人: 中金/摩根等第一梯队18分，第二梯队14分，第三梯队9分，其他6分
+- 投资者: 基石+知名机构(≥3家)16分，基石+无知名9分，无基石0分
+- 商业模式: `businessModel`(excellent/good/fair/poor) + `moatLevel`(wide/moderate/narrow/none)，满分17
+- AH折价: 非A+H股=1分(基础分)，A+H折价≥50%=2分，折价<50%=1分
+- 估值: 盈利用PE对比同行，亏损用PB对比(不因亏损扣分)，也支持`valuationLevel`(cheap/fair/premium/expensive)
+- 盈利能力: 亏损=0分，盈利=1分，盈利+增长=2分（亏损不代表不好）
+- 等级门槛: A+(≥80), A(72-79), A-(65-71), B+(58-64), B(48-57), B-(38-47), C+(28-37), C(18-27), D(<18)
+- 评分服务在 `src/services/ipoScoring.ts`，独立文件方便修改
+- 评分详情弹窗在 `src/components/IPOColumns.tsx`
+
+### 网络搜索补充评分数据
+- 当本地数据缺少 `businessModel`/`valuationLevel`/`moatLevel` 时，自动触发网络搜索
+- 搜索服务: `backend/scraper/web-search-service.js`
+- 搜索类型: 商业模式、估值、行业概况、AH股信息
+- AI分析: 有API时用AI分析，无API时用关键词匹配降级
+- 缓存: 24小时有效，存储在 `backend/data/search-cache/`
+- 手动触发API: `POST /api/scoring/enrich` (Body: `{ stockCode?: string }`)
+- 新增字段: `businessModelReason`, `moatReason`, `valuationReason`, `lastRoundValuation`
+
 ### 数据转换注意点
 - `ipoService.ts` 和 `realTimeDataService.ts` 的 `transformAPIData` 必须包含所有字段
 - 新增字段时需同时更新: types/index.ts → transformAPIData → prospectus-scraper.js → 静态JSON

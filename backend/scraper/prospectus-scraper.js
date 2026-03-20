@@ -7,6 +7,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs').promises;
 const path = require('path');
+const webSearchService = require('./web-search-service');
 
 class ProspectusScraper {
   constructor() {
@@ -446,6 +447,7 @@ class ProspectusScraper {
   /**
    * 检查并获取招股书数据
    * 如果本地没有，则从预设数据或网络获取
+   * 如果缺少商业模式等评分维度，自动从网络搜索补充
    */
   async ensureProspectusData(stockCode, basicInfo = {}) {
     // 1. 先尝试从本地读取
@@ -453,50 +455,84 @@ class ProspectusScraper {
     
     if (data) {
       console.log(`[ProspectusScraper] 从本地加载 ${stockCode} 数据`);
-      return data;
-    }
-
-    // 2. 本地没有，尝试从预设数据获取
-    data = this.extractKeyData(stockCode);
-    
-    if (data) {
-      console.log(`[ProspectusScraper] 从预设数据加载 ${stockCode} 数据`);
-      // 保存到本地
-      await this.saveProspectusData(stockCode, data);
-      return data;
-    }
-
-    // 3. 如果有基本信息，创建临时数据
-    if (basicInfo && basicInfo.stockName) {
-      console.log(`[ProspectusScraper] 创建临时数据 ${stockCode}`);
-      const tempData = {
-        stockCode,
-        stockName: basicInfo.stockName,
-        underwriter: basicInfo.underwriter || '待定',
-        cornerstone: false,
-        cornerstoneInvestors: [],
-        starInvestors: [],
-        peRatio: 0,
-        revenue: 0,
-        netProfit: 0,
-        revenueGrowth: 0,
-        profitGrowth: 0,
-        profitability: '待定',
-        hasGreenshoe: false,
-        isIndustryLeader: false,
-        industry: basicInfo.industry || '待定',
-        marketCap: '待定',
-        issuePrice: basicInfo.issuePrice || '待定',
-        sharesPerLot: 100,
-        riskLevel: '待定',
-        description: basicInfo.description || ''
-      };
+    } else {
+      // 2. 本地没有，尝试从预设数据获取
+      data = this.extractKeyData(stockCode);
       
-      await this.saveProspectusData(stockCode, tempData);
-      return tempData;
+      if (data) {
+        console.log(`[ProspectusScraper] 从预设数据加载 ${stockCode} 数据`);
+        // 保存到本地
+        await this.saveProspectusData(stockCode, data);
+      } else if (basicInfo && basicInfo.stockName) {
+        // 3. 如果有基本信息，创建临时数据
+        console.log(`[ProspectusScraper] 创建临时数据 ${stockCode}`);
+        data = {
+          stockCode,
+          stockName: basicInfo.stockName,
+          underwriter: basicInfo.underwriter || '待定',
+          cornerstone: false,
+          cornerstoneInvestors: [],
+          starInvestors: [],
+          peRatio: 0,
+          revenue: 0,
+          netProfit: 0,
+          revenueGrowth: 0,
+          profitGrowth: 0,
+          profitability: '待定',
+          hasGreenshoe: false,
+          isIndustryLeader: false,
+          industry: basicInfo.industry || '待定',
+          marketCap: '待定',
+          issuePrice: basicInfo.issuePrice || '待定',
+          sharesPerLot: 100,
+          riskLevel: '待定',
+          description: basicInfo.description || ''
+        };
+        
+        await this.saveProspectusData(stockCode, data);
+      }
     }
 
-    return null;
+    if (!data) return null;
+
+    // 4. 检查是否缺少评分维度数据，自动从网络搜索补充
+    const mergedInfo = { ...data, ...basicInfo };
+    if (webSearchService.needsSearch(data)) {
+      console.log(`[ProspectusScraper] ${stockCode} 缺少评分维度，触发网络搜索补充...`);
+      try {
+        const searchResult = await webSearchService.searchIPOAnalysis(
+          stockCode,
+          data.stockName || basicInfo.stockName,
+          mergedInfo
+        );
+        
+        if (searchResult) {
+          // 合并搜索结果（只覆盖空值）
+          data = {
+            ...data,
+            businessModel: searchResult.businessModel || data.businessModel,
+            businessModelReason: searchResult.businessModelReason || data.businessModelReason,
+            moatLevel: searchResult.moatLevel || data.moatLevel,
+            moatReason: searchResult.moatReason || data.moatReason,
+            valuationLevel: searchResult.valuationLevel || data.valuationLevel,
+            valuationReason: searchResult.valuationReason || data.valuationReason,
+            hasAShare: searchResult.hasAShare ?? data.hasAShare,
+            aShareCode: searchResult.aShareCode || data.aShareCode,
+            aSharePrice: searchResult.aSharePrice || data.aSharePrice,
+            ahDiscount: searchResult.ahDiscount ?? data.ahDiscount,
+            peerPeAvg: searchResult.peerPeAvg || data.peerPeAvg,
+            peerPbAvg: searchResult.peerPbAvg || data.peerPbAvg,
+            lastRoundValuation: searchResult.lastRoundValuation || data.lastRoundValuation,
+          };
+          // 更新本地缓存
+          await this.saveProspectusData(stockCode, data);
+        }
+      } catch (error) {
+        console.warn(`[ProspectusScraper] ${stockCode} 网络搜索补充失败:`, error.message);
+      }
+    }
+
+    return data;
   }
 }
 

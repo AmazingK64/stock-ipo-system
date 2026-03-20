@@ -136,7 +136,22 @@ class RealTimeDataService {
       oneHandWinRate: item.oneHandWinRate,
       subscriptionCount: item.subscriptionCount,
       latestUpdate: item.updateTime || item.latestUpdate,
-      source: item.source || 'api'
+      source: item.source || 'api',
+      // 新增评分维度字段
+      hasAShare: item.hasAShare,
+      aShareCode: item.aShareCode,
+      aSharePrice: item.aSharePrice,
+      ahDiscount: item.ahDiscount,
+      businessModel: item.businessModel,
+      moatLevel: item.moatLevel,
+      valuationLevel: item.valuationLevel,
+      pbRatio: item.pbRatio,
+      peerPeAvg: item.peerPeAvg,
+      peerPbAvg: item.peerPbAvg,
+      businessModelReason: item.businessModelReason,
+      moatReason: item.moatReason,
+      valuationReason: item.valuationReason,
+      lastRoundValuation: item.lastRoundValuation
     }));
   }
 

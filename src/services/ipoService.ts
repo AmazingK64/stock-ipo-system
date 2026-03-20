@@ -167,7 +167,22 @@ class IPOService {
       status: item.status, // 保留后端返回的状态
       daysToListing: item.daysToListing, // 保留距上市天数
       marginMultiple: item.marginMultiple, // 孖展倍数
-      publicSharesRatio: item.publicSharesRatio // 公开发售比例
+      publicSharesRatio: item.publicSharesRatio, // 公开发售比例
+      // 新增评分维度字段
+      hasAShare: item.hasAShare,
+      aShareCode: item.aShareCode,
+      aSharePrice: item.aSharePrice,
+      ahDiscount: item.ahDiscount,
+      businessModel: item.businessModel,
+      moatLevel: item.moatLevel,
+      valuationLevel: item.valuationLevel,
+      pbRatio: item.pbRatio,
+      peerPeAvg: item.peerPeAvg,
+      peerPbAvg: item.peerPbAvg,
+      businessModelReason: item.businessModelReason,
+      moatReason: item.moatReason,
+      valuationReason: item.valuationReason,
+      lastRoundValuation: item.lastRoundValuation
     }));
   }
 

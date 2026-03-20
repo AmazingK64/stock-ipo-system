@@ -47,6 +47,21 @@ export interface IPOStock {
   publicSharesRatio?: number; // 公开发售比例(%)，公开发售给散户的比例
   marginMultiple?: number; // 孖展倍数，申购热度指标
   hasCornerstoneOrStar?: boolean; // 是否有知名机构股东
+  // 新增评分维度
+  hasAShare?: boolean; // 是否A+H股双重上市
+  aShareCode?: string; // A股代码
+  aSharePrice?: number; // A股价格(元)
+  ahDiscount?: number; // H股相对A股折价率(%)
+  businessModel?: string; // 商业模式评价: excellent/good/fair/poor
+  moatLevel?: string; // 护城河水平: wide/moderate/narrow/none
+  valuationLevel?: string; // 估值水平: cheap/fair/premium/expensive
+  pbRatio?: number; // 市净率
+  peerPeAvg?: number; // 同行业平均PE
+  peerPbAvg?: number; // 同行业平均PB
+  businessModelReason?: string; // 商业模式评分理由
+  moatReason?: string; // 护城河评分理由
+  valuationReason?: string; // 估值评分理由
+  lastRoundValuation?: string; // 最后一轮融资估值
 }
 
 /** 实时行情数据 */
@@ -156,4 +171,19 @@ export interface IRawIPOData {
   daysToListing?: number; // 距上市天数
   marginMultiple?: number; // 孖展倍数(从subscribe-list接口获取)
   publicSharesRatio?: number; // 公开发售比例(%)，公开发售给散户的比例
+  // 新增评分维度
+  hasAShare?: boolean; // 是否A+H股双重上市
+  aShareCode?: string; // A股代码
+  aSharePrice?: number; // A股价格(元)
+  ahDiscount?: number; // H股相对A股折价率(%)，正数表示H股便宜
+  businessModel?: string; // 商业模式评价: 'excellent'(清晰可持续+宽护城河) | 'good'(较清晰) | 'fair'(一般) | 'poor'(不清晰/不可持续)
+  moatLevel?: string; // 护城河水平: 'wide'(宽) | 'moderate'(中等) | 'narrow'(窄) | 'none'(无)
+  valuationLevel?: string; // 估值水平: 'cheap'(便宜) | 'fair'(合理) | 'premium'(偏高) | 'expensive'(昂贵)
+  pbRatio?: number; // 市净率
+  peerPeAvg?: number; // 同行业平均PE
+  peerPbAvg?: number; // 同行业平均PB
+  businessModelReason?: string; // 商业模式评分理由(来自网络搜索)
+  moatReason?: string; // 护城河评分理由(来自网络搜索)
+  valuationReason?: string; // 估值评分理由(来自网络搜索)
+  lastRoundValuation?: string; // 最后一轮融资估值
 }
