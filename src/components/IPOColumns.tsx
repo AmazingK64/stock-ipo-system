@@ -3,8 +3,8 @@
  * 包含申购/即将上市、今日上市的列配置
  */
 
-import React, { useState } from 'react';
-import { Tag, Space, Progress, Modal, Divider, Row, Col, Card, Typography } from 'antd';
+import React from 'react';
+import { Tag, Space, Progress, Modal, Divider, Card, Typography } from 'antd';
 import {
   TrophyOutlined,
   FireOutlined,
@@ -67,13 +67,13 @@ const TextSecondary: React.FC<{ children: React.ReactNode; style?: React.CSSProp
 );
 
 /** 辅助组件 - 成功文字 */
-const TextSuccess: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span style={{ color: '#52c41a' }}>{children}</span>
+const TextSuccess: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) => (
+  <span style={{ color: '#52c41a', ...style }}>{children}</span>
 );
 
 /** 辅助组件 - 危险文字 */
-const TextDanger: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span style={{ color: '#ff4d4f' }}>{children}</span>
+const TextDanger: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) => (
+  <span style={{ color: '#ff4d4f', ...style }}>{children}</span>
 );
 
 /** 获取评分详情 */

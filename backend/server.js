@@ -11,10 +11,12 @@
 const express = require('express');
 const cors = require('cors');
 const net = require('net');
+const path = require('path');
 const etnetScraper = require('./scraper/etnet-scraper-fixed');
 const aastocksScraper = require('./scraper/aastocks-scraper');
 const prospectusScraper = require('./scraper/prospectus-scraper');
 const dataProvider = require('./dataProvider');
+const prospectusDownloader = require('./scraper/hkex-prospectus-downloader');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -49,6 +51,10 @@ function isPortInUse(port) {
 // 中间件
 app.use(cors());
 app.use(express.json());
+
+// 静态文件服务 - 提供本地招股书PDF下载
+const prospectusDir = path.join(__dirname, 'data', 'prospectus');
+app.use('/prospectus', express.static(prospectusDir));
 
 // 请求日志
 app.use((req, res, next) => {
@@ -424,6 +430,44 @@ app.get('/api/health', (req, res) => {
     uptime: process.uptime(),
     lastUpdate: cachedData.lastUpdate
   });
+});
+
+// ========== 招股书相关API ==========
+
+// 更新招股书库（下载新招股书 + 剔除过期数据）
+app.post('/api/prospectus/update', async (req, res) => {
+  try {
+    console.log('[API] 开始更新招股书库...');
+    const result = await prospectusDownloader.updateProspectusLibrary();
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('[API] 更新招股书库失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 获取本地招股书列表
+app.get('/api/prospectus/list', async (req, res) => {
+  try {
+    const list = await prospectusDownloader.getLocalProspectusList();
+    res.json({
+      success: true,
+      data: list,
+      count: list.length
+    });
+  } catch (error) {
+    console.error('[API] 获取招股书列表失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // 获取今日上市股票实时行情 (新增)
@@ -884,6 +928,9 @@ async function startServer() {
 ║   • GET /api/margin-data    - 获取孖展数据                ║
 ║   • GET /api/subscription    - 获取申购数据               ║
 ║   • GET /api/today-listed    - 获取今日上市实时行情        ║
+║   • POST /api/prospectus/update - 更新招股书库(下载+清理) ║
+║   • GET  /api/prospectus/list   - 获取本地招股书列表       ║
+║   • GET /prospectus/{file}  - 下载招股书PDF              ║
 ║   • GET /api/cached-data     - 获取缓存数据                ║
 ║   • GET /api/health          - 健康检查                   ║
 ║                                                           ║
@@ -891,6 +938,7 @@ async function startServer() {
 ║   • 静态JSON (完整数据)                                   ║
 ║   • ETNet (实时行情)                                       ║
 ║   • AASTOCKS (孖展数据)                                    ║
+║   • 披露易 (招股书下载)                                     ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
     `);

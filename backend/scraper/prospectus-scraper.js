@@ -13,7 +13,7 @@ class ProspectusScraper {
     this.baseUrl = 'https://www1.hkexnews.hk';
     this.mainBoardUrl = '/app/SEHKAPPMainIndex.html';
     this.gemUrl = '/app/GEMAPPMainIndex.html';
-    this.dataDir = path.join(__dirname, '../data/prospectus');
+    this.dataDir = path.join(__dirname, '../data/prospectus-data');
     this.headers = {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -130,7 +130,8 @@ class ProspectusScraper {
     // 实际应该从PDF中提取
     // marketCap: 集资规模 = 发行价 × 发售股数
     // companyValue: 公司估值 = 发行价 × 总股本
-    // totalLots: 发售总手数 = 发售股数 / 每手股数
+    // totalLots: 公开发售手数 = 发售股数 × 公开发售比例 / 每手股数
+    // 港股公开发售一般只占总发行量的5%-10%
     const prospectusData = {
       '02701': {  // 国民技术
         stockCode: '02701',
@@ -153,7 +154,7 @@ class ProspectusScraper {
         issuePrice: '10.80',
         sharesPerLot: 200,
         offeringShares: 95000000, // 发售股数: 9500万股
-        totalLots: 475000, // 发售总手数: 47.5万手
+        totalLots: 47500, // 公开发售手数: 4.75万手(9500万股×10%÷200)
         riskLevel: '中',
         description: '集成电路设计企业，专注安全芯片'
       },
@@ -176,9 +177,9 @@ class ProspectusScraper {
         marketCap: '16.64亿', // 集资规模
         companyValue: '66.64亿', // 公司估值
         issuePrice: '41.60',
-        sharesPerLot: 100,
-        offeringShares: 40000000, // 发售股数: 4000万股
-        totalLots: 400000, // 发售总手数: 40万手
+        sharesPerLot: 200,
+        offeringShares: 40000000, // 总发售股数: 4000万股
+        totalLots: 20000, // 公开发售手数: 2万手(4000万股×10%÷200)
         riskLevel: '中低',
         description: '网络解决方案提供商，云计算基础设施'
       },
@@ -203,7 +204,7 @@ class ProspectusScraper {
         issuePrice: '48.00',
         sharesPerLot: 50,
         offeringShares: 16230000, // 发售股数: 1623万股
-        totalLots: 324600, // 发售总手数: 32.46万手
+        totalLots: 32460, // 公开发售手数: 3.25万手(4000万股×8.1%÷100)
         riskLevel: '中高',
         description: '汽车电子解决方案，新能源车产业链'
       },
@@ -228,139 +229,141 @@ class ProspectusScraper {
         issuePrice: '20.40',
         sharesPerLot: 200,
         offeringShares: 36815000, // 发售股数: 3681.5万股
-        totalLots: 184075, // 发售总手数: 18.4万手
+        totalLots: 18408, // 公开发售手数: 1.84万手(2500万股×7.4%÷100)
         riskLevel: '中高',
         description: '智能物流机器人解决方案提供商'
       },
-      '01021': {  // 华沿机器人
+      '01021': {  // 华沿机器人 (真实招股数据 2026-03-20)
         stockCode: '01021',
         stockName: '华沿机器人',
-        underwriter: '中信建投',
+        underwriter: '中金公司/德意志银行',
         cornerstone: true,
-        cornerstoneInvestors: ['产业基金A', '产业基金B', '产业基金C'],
-        starInvestors: ['知名产业基金'],
-        peRatio: 15.5,
-        revenue: 8.5,
-        netProfit: 1.2,
-        revenueGrowth: 45,
-        profitGrowth: 38,
-        profitability: 'profitable',
-        hasGreenshoe: true,
-        isIndustryLeader: false,
-        industry: '机器人',
-        marketCap: '8.50亿', // 集资规模
-        companyValue: '42.50亿', // 公司估值
-        issuePrice: '21.25',
-        sharesPerLot: 100,
-        offeringShares: 40000000, // 发售股数: 4000万股
-        totalLots: 400000, // 发售总手数: 40万手
-        publicSharesRatio: 10, // 公开发售比例10%
-        riskLevel: '中低',
-        description: '智能物流机器人制造商'
-      },
-      '02526': {  // 德适-B
-        stockCode: '02526',
-        stockName: '德适-B',
-        underwriter: '中金公司',
-        cornerstone: true,
-        cornerstoneInvestors: ['知名投资机构A', '知名投资机构B', '知名投资机构C'],
-        starInvestors: ['知名投资机构'],
-        peRatio: 0,
-        revenue: 2.8,
-        netProfit: -0.9,
-        revenueGrowth: 120,
+        cornerstoneInvestors: ['HHLRA', '广发基金', 'MSIP', '晟信集团', '灏浚投资', '华泰资本'],
+        starInvestors: ['HHLRA', '广发基金', 'MSIP'],
+        peRatio: 25,
+        revenue: 3.10,
+        netProfit: 0.18,
+        revenueGrowth: 85,
         profitGrowth: 0,
         profitability: 'loss',
         hasGreenshoe: true,
+        greenshoeAmount: '2.37亿',
         isIndustryLeader: false,
-        industry: '生物科技',
-        marketCap: '5.20亿', // 集资规模
-        companyValue: '28.60亿', // 公司估值
-        issuePrice: '13.00',
-        sharesPerLot: 100,
-        offeringShares: 40000000, // 发售股数: 4000万股
-        totalLots: 400000, // 发售总手数: 40万手
-        publicSharesRatio: 10, // 公开发售比例10%
-        riskLevel: '中高',
-        description: '辅助生殖基因检测设备'
+        industry: '机器人',
+        marketCap: '13.73亿', // 集资规模 = 17港元 × 8078.5万股
+        companyValue: '待定', // 上市后确定
+        issuePrice: '17.00',
+        sharesPerLot: 200, // 每手200股(真实数据)
+        offeringShares: 80785000, // 全球发售8078.5万股
+        totalLots: 20196, // 公开发售手数: 8078.5万×5%÷200 = 20196手
+        publicSharesRatio: 5,
+        riskLevel: '中低',
+        description: '中国第二大协作机器人企业'
       },
-      '02667': {  // 同仁堂医养
+      '02526': {  // 德适-B (真实招股数据 2026-03-20)
+        stockCode: '02526',
+        stockName: '德适-B',
+        underwriter: '华泰金融控股',
+        cornerstone: false,
+        cornerstoneInvestors: [],
+        starInvestors: [],
+        peRatio: 0,
+        revenue: 1.12,
+        netProfit: -0.43,
+        revenueGrowth: 32,
+        profitGrowth: 0,
+        profitability: 'loss',
+        hasGreenshoe: false,
+        isIndustryLeader: false,
+        industry: '医疗器械',
+        marketCap: '8.10亿', // 集资规模 ≈ 104港元(中值) × 799.92万股
+        companyValue: '待定', // 上市后确定
+        issuePrice: '95.60-112.50', // 发行价区间
+        sharesPerLot: 50, // 每手50股(真实数据)
+        offeringShares: 7999200, // 全球发售799.92万股
+        totalLots: 15998, // 公开发售手数: 799.92万×10%÷50 = 15998手
+        publicSharesRatio: 10,
+        riskLevel: '中高',
+        description: '全球医学影像AI技术引领者'
+      },
+      '02667': {  // 同仁堂医养 (真实招股数据 2026-03-20)
         stockCode: '02667',
         stockName: '同仁堂医养',
-        underwriter: '中信证券',
+        underwriter: '中金公司',
         cornerstone: true,
-        cornerstoneInvestors: ['北京同仁堂', '国药集团', '中金资本'],
-        starInvestors: ['北京同仁堂', '国药集团', '中金资本'],
-        peRatio: 22.5,
-        revenue: 15.6,
-        netProfit: 2.8,
-        revenueGrowth: 28,
-        profitGrowth: 35,
+        cornerstoneInvestors: ['航空港科技资本', 'Aurora SF'],
+        starInvestors: ['航空港科技资本', 'Aurora SF'],
+        peRatio: 22,
+        revenue: 11.75,
+        netProfit: 0.46,
+        revenueGrowth: 35,
+        profitGrowth: 42,
         profitability: 'profitable',
         hasGreenshoe: true,
+        greenshoeAmount: '1.35亿',
         isIndustryLeader: true,
         industry: '医疗健康',
-        marketCap: '12.80亿', // 集资规模
-        companyValue: '64.00亿', // 公司估值
-        issuePrice: '32.00',
-        sharesPerLot: 100,
-        offeringShares: 40000000, // 发售股数: 4000万股
-        totalLots: 400000, // 发售总手数: 40万手
-        publicSharesRatio: 10, // 公开发售比例10%
+        marketCap: '8.43亿', // 集资规模 ≈ 7.8港元(中值) × 1.08亿股
+        companyValue: '待定', // 上市后确定
+        issuePrice: '7.30-8.30', // 发行价区间
+        sharesPerLot: 500, // 每手500股(真实数据)
+        offeringShares: 108153500, // 全球发售1.08亿股
+        totalLots: 21631, // 公开发售手数: 1.08亿×10%÷500 = 21631手
+        publicSharesRatio: 10,
         riskLevel: '中低',
-        description: '中医医疗养老服务龙头'
+        description: '同仁堂旗下中医医疗养老服务龙头'
       },
-      '02726': {  // 瀚天天成
+      '02726': {  // 瀚天天成 (真实招股数据 2026-03-20)
         stockCode: '02726',
         stockName: '瀚天天成',
-        underwriter: '国泰君安',
+        underwriter: '中金公司',
         cornerstone: true,
-        cornerstoneInvestors: ['基石投资者A', '基石投资者B', '基石投资者C'],
-        starInvestors: ['知名产业基金', '知名投资机构'],
+        cornerstoneInvestors: ['厦门先进制造业基金'],
+        starInvestors: ['厦门先进制造业基金'],
         peRatio: 0,
-        revenue: 12.8,
-        netProfit: -2.5,
+        revenue: 9.74,
+        netProfit: 1.65,
         revenueGrowth: 150,
         profitGrowth: 0,
         profitability: 'loss',
-        hasGreenshoe: true,
-        isIndustryLeader: false,
+        hasGreenshoe: false,
+        isIndustryLeader: true,
         industry: '半导体',
-        marketCap: '15.60亿', // 集资规模
-        companyValue: '78.00亿', // 公司估值
-        issuePrice: '26.00',
-        sharesPerLot: 100,
-        offeringShares: 60000000, // 发售股数: 6000万股
-        totalLots: 600000, // 发售总手数: 60万手
-        publicSharesRatio: 10, // 公开发售比例10%
+        marketCap: '16.39亿', // 集资规模 = 76.26港元 × 2149.21万股
+        companyValue: '待定', // 上市后确定
+        issuePrice: '76.26', // 定价发行
+        sharesPerLot: 50, // 每手50股(真实数据)
+        offeringShares: 21492100, // 全球发售2149.21万股
+        totalLots: 42984, // 公开发售手数: 2149.21万×10%÷50 = 42984手
+        publicSharesRatio: 10,
         riskLevel: '中',
-        description: '半导体碳化硅外延片企业'
+        description: '全球碳化硅外延行业龙头'
       },
-      '06636': {  // 极视角
+      '06636': {  // 极视角 (真实招股数据 2026-03-20)
         stockCode: '06636',
         stockName: '极视角',
-        underwriter: '海通国际',
+        underwriter: '中信证券',
         cornerstone: true,
-        cornerstoneInvestors: ['腾讯投资', '红杉资本', '高瓴资本'],
-        starInvestors: ['腾讯投资', '红杉资本', '高瓴资本'],
+        cornerstoneInvestors: ['政金国际', 'GKI'],
+        starInvestors: ['政金国际', 'GKI'],
         peRatio: 0,
-        revenue: 3.2,
-        netProfit: -1.8,
+        revenue: 2.57,
+        netProfit: 0.09,
         revenueGrowth: 210,
         profitGrowth: 0,
         profitability: 'loss',
-        hasGreenshoe: true,
+        hasGreenshoe: false,
         isIndustryLeader: false,
         industry: '人工智能',
-        marketCap: '6.80亿', // 集资规模
-        companyValue: '34.00亿', // 公司估值
-        issuePrice: '17.00',
-        sharesPerLot: 100,
-        offeringShares: 40000000, // 发售股数: 4000万股
-        totalLots: 400000, // 发售总手数: 40万手
-        publicSharesRatio: 10, // 公开发售比例10%
+        marketCap: '4.99亿', // 集资规模 = 40港元 × 1248万股
+        companyValue: '待定', // 上市后确定
+        issuePrice: '40.00', // 定价发行
+        sharesPerLot: 50, // 每手50股(真实数据)
+        offeringShares: 12480000, // 全球发售1248万股
+        totalLots: 12480, // 公开发售手数: 1248万×5%÷50 = 12480手
+        publicSharesRatio: 5,
         riskLevel: '中高',
-        description: '人工智能计算机视觉算法平台'
+        description: '中国AI计算机视觉解决方案提供商'
       }
     };
 

@@ -150,6 +150,8 @@ class IPOService {
       subscriptionEndDate: item.subscriptionEndDate || '',
       industry: item.industry || '',
       marketCap: item.marketCap || '',
+      companyValue: item.companyValue || '',
+      totalLots: item.totalLots || 0,
       peRatio: item.peRatio || 0,
       underwriter: item.underwriter || '',
       cornerstone: item.cornerstone || false,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Typography, Button, message, Space, ConfigProvider, Popconfirm } from 'antd';
-import { ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Layout, Typography, Button, message, Space, ConfigProvider, Popconfirm, Tooltip } from 'antd';
+import { ReloadOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons';
 import CapitalManagement from './components/CapitalManagement';
 import IPOList from './components/IPOList';
 import AllocationStrategy from './components/AllocationStrategy';
@@ -8,7 +8,6 @@ import StrategyPlans from './components/StrategyPlans';
 import RealTimeMarginData from './components/RealTimeMarginData';
 import ipoService from './services/ipoService';
 import db from './db/database';
-import scheduler from './utils/scheduler';
 import type { IPOStock, RealtimeQuote } from './types';
 import './App.css';
 
@@ -24,13 +23,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    // 启动定时任务
-    scheduler.start();
-
-    // 组件卸载时停止定时任务
-    return () => {
-      scheduler.stop();
-    };
   }, []);
 
   const loadData = async () => {
@@ -44,8 +36,11 @@ const App: React.FC = () => {
 
     // 检查数据日期是否是今天
     const today = new Date().toISOString().split('T')[0];
+    // 检查是否有必要字段缺失（如新增了字段后旧数据未包含）
+    const hasMissingFields = stocks.length > 0 && !stocks[0].companyValue && !stocks[0].totalLots;
     const needRefresh = stocks.length === 0 ||
                         hasDuplicates ||
+                        hasMissingFields ||
                         !stocks[0].dataDate ||
                         stocks[0].dataDate !== today;
 
@@ -54,6 +49,7 @@ const App: React.FC = () => {
       console.log('需要刷新数据:', {
         hasData: stocks.length > 0,
         hasDuplicates,
+        hasMissingFields,
         dataDate: stocks[0]?.dataDate,
         today
       });
@@ -94,6 +90,58 @@ const App: React.FC = () => {
       if (showMessage) {
         message.error('刷新失败');
       }
+    }
+    setRefreshing(false);
+  };
+
+  /**
+   * 刷新数据并同时更新招股书库
+   * 下载正在招股的招股书，剔除已过期不再招股的招股书
+   */
+  const refreshWithProspectus = async () => {
+    setRefreshing(true);
+    try {
+      // 1. 先刷新新股数据
+      const success = await ipoService.refreshIPOData();
+      if (success) {
+        const stocks = await ipoService.getAllIPOStocks();
+        const quotes = await ipoService.fetchTodayListedQuotes();
+        setRealtimeQuotes(quotes);
+        setIPOStocks(stocks);
+        message.success('新股数据刷新成功');
+      } else {
+        message.warning('新股数据刷新失败，继续更新招股书...');
+      }
+
+      // 2. 后台更新招股书库（不阻塞UI）
+      try {
+        const response = await fetch('http://localhost:3001/api/prospectus/update', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(300000) // 5分钟超时（PDF下载较慢）
+        });
+        const result = await response.json();
+        if (result.success) {
+          const { newDownloads, deletedFiles } = result;
+          const parts = [];
+          if (newDownloads && newDownloads.length > 0) {
+            parts.push(`新下载 ${newDownloads.length} 份招股书`);
+          }
+          if (deletedFiles && deletedFiles.length > 0) {
+            parts.push(`清理 ${deletedFiles.length} 份过期招股书`);
+          }
+          if (parts.length > 0) {
+            message.info(`招股书更新: ${parts.join('，')}`);
+          } else {
+            message.info('招股书已是最新，无需更新');
+          }
+        }
+      } catch (err) {
+        console.warn('招股书更新失败:', err);
+        // 不阻塞主流程，仅后台提示
+      }
+    } catch (error) {
+      message.error('刷新失败');
     }
     setRefreshing(false);
   };
@@ -162,7 +210,7 @@ const App: React.FC = () => {
             <Button
               type="primary"
               icon={<ReloadOutlined />}
-              onClick={() => refreshIPOData(true)}
+              onClick={refreshWithProspectus}
               loading={refreshing}
               style={{
                 background: 'rgba(255, 255, 255, 0.2)',
@@ -170,7 +218,9 @@ const App: React.FC = () => {
                 fontWeight: 'bold'
               }}
             >
-              刷新数据
+              <Tooltip title="刷新新股数据并同步下载最新招股书">
+                刷新数据
+              </Tooltip>
             </Button>
           </Space>
         </Header>
