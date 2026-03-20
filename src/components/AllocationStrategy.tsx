@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Table, Statistic, Row, Col, Tag, Space, Typography, Empty, Divider, Button, Modal } from 'antd';
 import { ThunderboltOutlined, CalculatorOutlined, CalendarOutlined, HistoryOutlined } from '@ant-design/icons';
 import ipoService from '../services/ipoService';
@@ -12,44 +12,47 @@ interface AllocationStrategyProps {
 }
 
 const AllocationStrategy: React.FC<AllocationStrategyProps> = ({ capital, ipoStocks }) => {
-  const [allocations, setAllocations] = useState<Allocation[]>([]);
-  const [totalFinancing, setTotalFinancing] = useState<number>(0);
-  const [historyModalVisible, setHistoryModalVisible] = useState(false);
-  const [currentAndFutureAllocations, setCurrentAndFutureAllocations] = useState<Allocation[]>([]);
-  const [historicalAllocations, setHistoricalAllocations] = useState<Allocation[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  useEffect(() => {
-    if (capital > 0 && ipoStocks.length > 0) {
-      const result = ipoService.calculateAllocation(capital, ipoStocks);
-      setAllocations(result);
-      
-      const totalFin = result.reduce((sum, item) => sum + item.financingAmount, 0);
-      setTotalFinancing(totalFin);
-
-      // 分离当前/未来批次和历史批次(基于申购截止日期)
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      
-      const current: Allocation[] = [];
-      const historical: Allocation[] = [];
-      
-      result.forEach(allocation => {
-        if (allocation.subscriptionEndDate) {
-          const subscriptionEndDate = new Date(allocation.subscriptionEndDate);
-          if (subscriptionEndDate >= now) {
-            current.push(allocation);
-          } else {
-            historical.push(allocation);
-          }
-        } else {
-          // 没有申购截止日期的当作当前批次
-          current.push(allocation);
-        }
-      });
-      
-      setCurrentAndFutureAllocations(current);
-      setHistoricalAllocations(historical);
+  // 使用 useMemo 计算分配结果，避免在 effect 中多次 setState
+  const { allocations, totalFinancing, currentAndFutureAllocations, historicalAllocations } = useMemo(() => {
+    if (capital <= 0 || ipoStocks.length === 0) {
+      return {
+        allocations: [] as Allocation[],
+        totalFinancing: 0,
+        currentAndFutureAllocations: [] as Allocation[],
+        historicalAllocations: [] as Allocation[]
+      };
     }
+
+    const result = ipoService.calculateAllocation(capital, ipoStocks);
+    const totalFin = result.reduce((sum, item) => sum + item.financingAmount, 0);
+
+    // 分离当前/未来批次和历史批次(基于申购截止日期)
+    const now = new Date();
+    const current: Allocation[] = [];
+    const historical: Allocation[] = [];
+
+    result.forEach(allocation => {
+      if (allocation.subscriptionEndDate) {
+        const subscriptionEndDate = new Date(allocation.subscriptionEndDate);
+        if (subscriptionEndDate >= now) {
+          current.push(allocation);
+        } else {
+          historical.push(allocation);
+        }
+      } else {
+        // 没有申购截止日期的当作当前批次
+        current.push(allocation);
+      }
+    });
+
+    return {
+      allocations: result,
+      totalFinancing: totalFin,
+      currentAndFutureAllocations: current,
+      historicalAllocations: historical
+    };
   }, [capital, ipoStocks]);
 
   const columns = [
@@ -165,14 +168,14 @@ const AllocationStrategy: React.FC<AllocationStrategyProps> = ({ capital, ipoSto
   };
 
   // 渲染批次表格
-  const renderBatchTables = (groupedAllocations: Record<string, Allocation[]>) => {
+  const renderBatchTables = (groupedAllocations: Record<string, Allocation[]>, isHistory = false) => {
     return Object.entries(groupedAllocations).map(([subscriptionEndDate, batchAllocations]) => {
       const batchTotalCapital = batchAllocations.reduce((sum, item) => sum + item.capitalAllocation, 0);
       const batchTotalFinancing = batchAllocations.reduce((sum, item) => sum + item.financingAmount, 0);
       
       return (
         <div key={subscriptionEndDate} style={{ marginBottom: 24 }}>
-          <Divider orientation={'left' as any}>
+          <Divider titlePlacement="left">
             <Space>
               <CalendarOutlined style={{ color: '#1890ff' }} />
               <Text strong style={{ fontSize: 16 }}>
@@ -182,6 +185,7 @@ const AllocationStrategy: React.FC<AllocationStrategyProps> = ({ capital, ipoSto
               <Tag color="green">
                 申购总额: HK${(batchTotalCapital + batchTotalFinancing).toFixed(2)}
               </Tag>
+              {isHistory && <Tag color="orange">已截止</Tag>}
             </Space>
           </Divider>
           
@@ -223,168 +227,189 @@ const AllocationStrategy: React.FC<AllocationStrategyProps> = ({ capital, ipoSto
     });
   };
 
-  if (capital === 0) {
-    return (
-      <Card
-        title={
-          <Space>
-            <CalculatorOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-            <Text strong style={{ fontSize: 18 }}>融资分配策略</Text>
-          </Space>
-        }
-        style={{ borderRadius: 16, boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}
-      >
-        <Empty description="请先设置资金总量" />
-      </Card>
-    );
-  }
-
-  if (allocations.length === 0) {
-    return (
-      <Card
-        title={
-          <Space>
-            <CalculatorOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-            <Text strong style={{ fontSize: 18 }}>融资分配策略</Text>
-          </Space>
-        }
-        style={{ borderRadius: 16, boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}
-      >
-        <Empty description="暂无符合条件的优质新股(B级及以上)" />
-      </Card>
-    );
-  }
-
+  // 统计信息
   const currentGroupedAllocations = groupAllocationsByDate(currentAndFutureAllocations);
   const historicalGroupedAllocations = groupAllocationsByDate(historicalAllocations);
+  const currentBatchesCount = Object.keys(currentGroupedAllocations).length;
+  const historicalBatchesCount = Object.keys(historicalGroupedAllocations).length;
 
   return (
     <>
       <Card
-        title={
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Space>
-              <CalculatorOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-              <Text strong style={{ fontSize: 18 }}>融资分配策略 (按上市批次)</Text>
-              {historicalAllocations.length > 0 && (
-                <Tag color="orange">{historicalAllocations.length}个历史批次</Tag>
-              )}
-            </Space>
-            {historicalAllocations.length > 0 && (
-              <Button
-                type="link"
-                icon={<HistoryOutlined />}
-                onClick={() => setHistoryModalVisible(true)}
-              >
-                查看历史批次
-              </Button>
-            )}
-          </Space>
-        }
-        style={{ 
+        style={{
+          marginTop: 32,
           marginBottom: 24,
           borderRadius: 16,
           boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
         }}
       >
-        {currentAndFutureAllocations.length === 0 ? (
-          <Empty description="暂无当前或未来的申购批次" />
-        ) : (
-          <>
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col xs={24} sm={8}>
-                <Card 
-                  style={{ 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none'
-                  }}
-                >
-                  <Statistic
-                    title={<span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>自有资金</span>}
-                    value={capital}
-                    precision={2}
-                    prefix="HK$"
-                    valueStyle={{ color: '#fff', fontSize: 20 }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Card 
-                  style={{ 
-                    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                    border: 'none'
-                  }}
-                >
-                  <Statistic
-                    title={<span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>融资总额</span>}
-                    value={totalFinancing}
-                    precision={2}
-                    prefix="HK$"
-                    valueStyle={{ color: '#fff', fontSize: 20 }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Card 
-                  style={{ 
-                    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                    border: 'none'
-                  }}
-                >
-                  <Statistic
-                    title={<span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>申购总额</span>}
-                    value={capital + totalFinancing}
-                    precision={2}
-                    prefix="HK$"
-                    valueStyle={{ color: '#fff', fontSize: 20 }}
-                  />
-                </Card>
-              </Col>
-            </Row>
-
-            {/* 当前和未来批次 */}
-            {renderBatchTables(currentGroupedAllocations)}
-
-            <Card 
-              style={{ 
-                marginTop: 24, 
-                background: '#fff7e6',
-                border: '1px solid #ffd591',
-                borderRadius: 8
-              }}
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+            <Space>
+              <CalculatorOutlined style={{ color: '#1890ff', fontSize: 20 }} />
+              <Text strong style={{ fontSize: 16 }}>融资分配策略</Text>
+            </Space>
+            <Button
+              type="primary"
+              icon={<CalculatorOutlined />}
+              onClick={() => setModalVisible(true)}
             >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Text strong style={{ color: '#fa8c16' }}>
-                  <ThunderboltOutlined style={{ marginRight: 8 }} />
-                  策略说明:
-                </Text>
-                <Text>• 同一批次上市的新股资金不冲突,可同时申购</Text>
-                <Text>• 不同批次上市的新股,资金需要等上一批次上市后才能用于下一批次</Text>
-                <Text>• 系统按上市日期分组,每批独立分配资金</Text>
-                <Text>• 融资倍数: A+级别10倍, A级别7倍, B+级别4倍, 最高不超过10倍</Text>
-                <Text type="warning">⚠️ 例如: 5万资金 + 10倍融资 = 最高可申购50万新股</Text>
-                <Text type="warning">⚠️ 提示: 融资申购需承担利息成本,请根据风险承受能力调整</Text>
-              </Space>
-            </Card>
-          </>
-        )}
+              查看分配详情
+            </Button>
+          </Space>
+          
+          {capital === 0 ? (
+            <Empty description="请先设置资金总量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : allocations.length === 0 ? (
+            <Empty description="暂无符合条件的优质新股(B级及以上)" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : (
+            <Space wrap>
+              <Tag color="blue" style={{ fontSize: 13, padding: '4px 12px' }}>
+                当前批次: {currentBatchesCount}个
+              </Tag>
+              {historicalBatchesCount > 0 && (
+                <Tag color="orange" style={{ fontSize: 13, padding: '4px 12px' }}>
+                  历史批次: {historicalBatchesCount}个
+                </Tag>
+              )}
+              <Tag color="green" style={{ fontSize: 13, padding: '4px 12px' }}>
+                自有资金: HK${capital.toLocaleString()}
+              </Tag>
+              <Tag color="purple" style={{ fontSize: 13, padding: '4px 12px' }}>
+                融资总额: HK${totalFinancing.toLocaleString()}
+              </Tag>
+              <Tag color="cyan" style={{ fontSize: 13, padding: '4px 12px' }}>
+                申购总额: HK${(capital + totalFinancing).toLocaleString()}
+              </Tag>
+            </Space>
+          )}
+        </Space>
       </Card>
 
-      {/* 历史批次弹窗 */}
+      {/* 分配详情弹窗 */}
       <Modal
         title={
           <Space>
-            <HistoryOutlined style={{ color: '#fa8c16' }} />
-            <Text>历史批次分配记录</Text>
+            <CalculatorOutlined style={{ color: '#1890ff' }} />
+            <Text>融资分配策略详情</Text>
           </Space>
         }
-        open={historyModalVisible}
-        onCancel={() => setHistoryModalVisible(false)}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
         footer={null}
-        width={1200}
+        width={1400}
       >
-        <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          {renderBatchTables(historicalGroupedAllocations)}
+        <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+          {capital === 0 ? (
+            <Empty description="请先设置资金总量" />
+          ) : allocations.length === 0 ? (
+            <Empty description="暂无符合条件的优质新股(B级及以上)" />
+          ) : (
+            <>
+              {/* 统计卡片 */}
+              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                <Col xs={24} sm={8}>
+                  <Card 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none'
+                    }}
+                  >
+                    <Statistic
+                      title={<span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>自有资金</span>}
+                      value={capital}
+                      precision={2}
+                      prefix="HK$"
+                      valueStyle={{ color: '#fff', fontSize: 20 }}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                      border: 'none'
+                    }}
+                  >
+                    <Statistic
+                      title={<span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>融资总额</span>}
+                      value={totalFinancing}
+                      precision={2}
+                      prefix="HK$"
+                      valueStyle={{ color: '#fff', fontSize: 20 }}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                      border: 'none'
+                    }}
+                  >
+                    <Statistic
+                      title={<span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>申购总额</span>}
+                      value={capital + totalFinancing}
+                      precision={2}
+                      prefix="HK$"
+                      valueStyle={{ color: '#fff', fontSize: 20 }}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* 当前和未来批次 */}
+              {currentAndFutureAllocations.length > 0 && (
+                <>
+                  <Divider titlePlacement="left">
+                    <Space>
+                      <CalendarOutlined style={{ color: '#52c41a' }} />
+                      <Text strong>当前/未来申购批次</Text>
+                      <Tag color="green">{currentBatchesCount}个批次</Tag>
+                    </Space>
+                  </Divider>
+                  {renderBatchTables(currentGroupedAllocations)}
+                </>
+              )}
+
+              {/* 历史批次 */}
+              {historicalAllocations.length > 0 && (
+                <>
+                  <Divider titlePlacement="left">
+                    <Space>
+                      <HistoryOutlined style={{ color: '#fa8c16' }} />
+                      <Text strong>历史批次</Text>
+                      <Tag color="orange">{historicalBatchesCount}个批次</Tag>
+                    </Space>
+                  </Divider>
+                  {renderBatchTables(historicalGroupedAllocations, true)}
+                </>
+              )}
+
+              {/* 策略说明 */}
+              <Card 
+                style={{ 
+                  marginTop: 24, 
+                  background: '#fff7e6',
+                  border: '1px solid #ffd591',
+                  borderRadius: 8
+                }}
+              >
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text strong style={{ color: '#fa8c16' }}>
+                    <ThunderboltOutlined style={{ marginRight: 8 }} />
+                    策略说明:
+                  </Text>
+                  <Text>• 同一批次上市的新股资金不冲突,可同时申购</Text>
+                  <Text>• 不同批次上市的新股,资金需要等上一批次上市后才能用于下一批次</Text>
+                  <Text>• 系统按申购截止日期分组,每批独立分配资金</Text>
+                  <Text>• 融资倍数: A+级别10倍, A级别7倍, B+级别4倍, 最高不超过10倍</Text>
+                  <Text type="warning">⚠️ 例如: 5万资金 + 10倍融资 = 最高可申购50万新股</Text>
+                  <Text type="warning">⚠️ 提示: 融资申购需承担利息成本,请根据风险承受能力调整</Text>
+                </Space>
+              </Card>
+            </>
+          )}
         </div>
       </Modal>
     </>

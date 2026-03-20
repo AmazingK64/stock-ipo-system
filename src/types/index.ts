@@ -11,12 +11,15 @@ export interface IPOStock {
   subscriptionStartDate: string;
   subscriptionEndDate: string;
   industry: string;
-  marketCap: string;
+  marketCap: string; // 集资规模(IPO发售金额)
+  companyValue?: string; // 公司估值(发行价 × 总股本)
   peRatio: number;
   underwriter: string;
   cornerstone: boolean;
   starInvestors: string[];
   sharesPerLot: number; // 每手股数
+  totalLots?: number; // 发售总手数
+  offeringShares?: number; // 发售股数
   hasGreenshoe: boolean; // 绿鞋机制(超额配售权)
   isIndustryLeader: boolean; // 是否行业龙头
   profitability: 'profitable' | 'loss' | 'breakeven'; // 盈利状况
@@ -40,6 +43,10 @@ export interface IPOStock {
   industryHistoryReturn?: number; // 同行业历史平均涨幅
   similarCompanies?: SimilarCompany[]; // 同类公司历史数据
   createdAt: string;
+  // 新增评分维度
+  publicSharesRatio?: number; // 公开发售比例(%)，公开发售给散户的比例
+  marginMultiple?: number; // 孖展倍数，申购热度指标
+  hasCornerstoneOrStar?: boolean; // 是否有知名机构股东
 }
 
 /** 实时行情数据 */
@@ -129,12 +136,15 @@ export interface IRawIPOData {
   subscriptionStartDate: string;
   subscriptionEndDate: string;
   industry: string;
-  marketCap: string;
+  marketCap: string; // 集资规模(IPO发售金额)
+  companyValue?: string; // 公司估值(发行价 × 总股本)
   peRatio: number;
   underwriter: string;
   cornerstone: boolean;
   starInvestors: string[];
   sharesPerLot: number; // 每手股数
+  totalLots?: number; // 发售总手数
+  offeringShares?: number; // 发售股数
   hasGreenshoe: boolean; // 绿鞋机制
   isIndustryLeader: boolean; // 行业龙头
   profitability: 'profitable' | 'loss' | 'breakeven'; // 盈利状况
@@ -144,4 +154,6 @@ export interface IRawIPOData {
   profitGrowth: number; // 净利润增长率
   status?: IPOStatus; // IPO状态(从后端返回)
   daysToListing?: number; // 距上市天数
+  marginMultiple?: number; // 孖展倍数(从subscribe-list接口获取)
+  publicSharesRatio?: number; // 公开发售比例(%)，公开发售给散户的比例
 }

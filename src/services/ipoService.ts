@@ -1,5 +1,6 @@
 import db from '../db/database';
 import type { IPOStock, Allocation, IRawIPOData, IPOStrategy, CategorizedIPOData, RealtimeQuote } from '../types';
+import ipoScoringService from './ipoScoring';
 
 // 港股新股信息获取服务
 class IPOService {
@@ -162,7 +163,9 @@ class IPOService {
       revenueGrowth: item.revenueGrowth || 0,
       profitGrowth: item.profitGrowth || 0,
       status: item.status, // 保留后端返回的状态
-      daysToListing: item.daysToListing // 保留距上市天数
+      daysToListing: item.daysToListing, // 保留距上市天数
+      marginMultiple: item.marginMultiple, // 孖展倍数
+      publicSharesRatio: item.publicSharesRatio // 公开发售比例
     }));
   }
 
@@ -295,118 +298,24 @@ class IPOService {
   }
 
   /**
-   * 计算新股评分
+   * 计算新股评分（委托给评分服务）
    */
   calculateIPOScore(ipoData: IRawIPOData): number {
-    let score = 0;
-
-    // 行业热度评分
-    const hotIndustries = ['人工智能', '新能源', '生物医药', '半导体', '集成电路', '智能物流机器人', '汽车电子'];
-    const techIndustries = ['印制电路板', '网络解决方案', '智能物流机器人'];
-    
-    if (hotIndustries.includes(ipoData.industry)) {
-      score += 25;
-    } else if (techIndustries.includes(ipoData.industry)) {
-      score += 22;
-    } else if (ipoData.industry.includes('科技') || ipoData.industry.includes('互联网')) {
-      score += 20;
-    } else {
-      score += 10;
-    }
-
-    // 保荐人评分
-    const topUnderwriters = ['中金公司', '中信证券', '摩根士丹利', '高盛', '花旗银行', '瑞银', '国泰君安'];
-    if (topUnderwriters.includes(ipoData.underwriter)) {
-      score += 20;
-    } else {
-      score += 10;
-    }
-
-    // 基石投资者评分
-    if (ipoData.cornerstone) {
-      score += 15;
-    }
-    if (ipoData.starInvestors && ipoData.starInvestors.length > 0) {
-      score += 5;
-    }
-
-    // 市值规模评分
-    const marketCap = parseFloat(ipoData.marketCap.replace('亿', ''));
-    if (marketCap > 200) {
-      score += 15;
-    } else if (marketCap > 100) {
-      score += 12;
-    } else if (marketCap > 50) {
-      score += 10;
-    } else if (marketCap > 20) {
-      score += 8;
-    } else {
-      score += 5;
-    }
-
-    // 估值水平评分
-    if (ipoData.peRatio === 0) {
-      // 亏损企业,谨慎评分
-      score += 5;
-    } else if (ipoData.peRatio < 20) {
-      score += 20;
-    } else if (ipoData.peRatio < 30) {
-      score += 15;
-    } else if (ipoData.peRatio < 40) {
-      score += 10;
-    } else {
-      score += 5;
-    }
-
-    return score;
+    return ipoScoringService.calculateScore(ipoData);
   }
 
   /**
-   * 根据评分获取等级
+   * 根据评分获取等级（委托给评分服务）
    */
   getGrade(score: number): string {
-    if (score >= 85) return 'A+';
-    if (score >= 75) return 'A';
-    if (score >= 65) return 'B+';
-    if (score >= 55) return 'B';
-    if (score >= 45) return 'C+';
-    if (score >= 35) return 'C';
-    return 'D';
+    return ipoScoringService.getGrade(score);
   }
 
   /**
-   * 生成打新策略建议
+   * 生成打新策略建议（委托给评分服务）
    */
   generateStrategy(_score: number, grade: string): IPOStrategy {
-    if (grade.startsWith('A')) {
-      return {
-        recommendation: '强烈推荐',
-        action: '建议积极参与,可融资申购',
-        riskLevel: '低',
-        expectedReturn: '30-50%'
-      };
-    } else if (grade.startsWith('B')) {
-      return {
-        recommendation: '推荐',
-        action: '建议现金申购',
-        riskLevel: '中',
-        expectedReturn: '15-30%'
-      };
-    } else if (grade.startsWith('C')) {
-      return {
-        recommendation: '谨慎',
-        action: '少量参与或不参与',
-        riskLevel: '高',
-        expectedReturn: '5-15%'
-      };
-    } else {
-      return {
-        recommendation: '不推荐',
-        action: '不建议参与',
-        riskLevel: '极高',
-        expectedReturn: '不确定'
-      };
-    }
+    return ipoScoringService.generateStrategy(_score, grade);
   }
 
   /**
@@ -472,8 +381,8 @@ class IPOService {
     
     // 对每个申购批次进行分配
     sortedGroups.forEach(([_subscriptionEndDate, groupIPOs]) => {
-      // 筛选评分B+以上的新股
-      const highQualityIPOs = groupIPOs.filter(ipo => ipo.score >= 55);
+      // 筛选评分B+以上的新股（分数>=80）
+      const highQualityIPOs = groupIPOs.filter(ipo => ipo.score >= 80);
       
       if (highQualityIPOs.length === 0) {
         return;

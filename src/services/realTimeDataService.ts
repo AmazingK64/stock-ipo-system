@@ -26,37 +26,48 @@ interface MarginDataSource {
 
 class RealTimeDataService {
   private apiBaseURL = 'http://localhost:3001/api';
+  /** 上次成功获取的数据缓存，获取失败时降级使用 */
+  private lastSuccessfulData: RealTimeIPOData[] = [];
 
   /**
-   * 获取实时IPO数据
-   * 优先从后端API获取真实数据
+   * 获取实时IPO数据（仅正在招股的）
+   * 优先从后端API获取真实数据，获取失败则展示上一次缓存数据
    */
   async fetchRealTimeIPOData(): Promise<RealTimeIPOData[]> {
     try {
-      // 尝试从后端API获取真实数据
+      // 尝试从后端API获取真实数据（只获取subscribe状态的）
       const realData = await this.fetchFromBackend();
       if (realData.length > 0) {
         console.log('[RealTimeData] 使用真实数据，共', realData.length, '条');
+        this.lastSuccessfulData = realData; // 缓存成功数据
         return realData;
       }
     } catch (error) {
-      console.warn('[RealTimeData] 后端API不可用，使用模拟数据:', error);
+      console.warn('[RealTimeData] 后端API不可用:', error);
     }
 
-    // 降级到模拟数据
-    console.log('[RealTimeData] 使用模拟数据（请启动后端服务以获取真实数据）');
+    // 降级：返回上一次成功获取的数据
+    if (this.lastSuccessfulData.length > 0) {
+      console.log('[RealTimeData] API获取失败，使用上次缓存数据，共', this.lastSuccessfulData.length, '条');
+      return this.lastSuccessfulData;
+    }
+
+    // 最终降级到模拟数据
+    console.log('[RealTimeData] 无缓存数据，使用模拟数据（请启动后端服务以获取真实数据）');
     return this.getMockData();
   }
 
   /**
    * 从后端API获取真实数据
+   * 使用 /api/subscribe-list 只获取申购中的股票
    */
   private async fetchFromBackend(): Promise<RealTimeIPOData[]> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
 
-      const response = await fetch(`${this.apiBaseURL}/ipo-list`, {
+      // 使用subscribe-list接口，后端已过滤只返回正在招股的
+      const response = await fetch(`${this.apiBaseURL}/subscribe-list`, {
         signal: controller.signal,
         headers: {
           'Accept': 'application/json'
@@ -72,8 +83,11 @@ class RealTimeDataService {
       const result = await response.json();
 
       if (result.success && result.data && result.data.length > 0) {
-        // 将API数据转换为前端格式
-        return this.transformAPIData(result.data);
+        // 将API数据转换为前端格式，并额外过滤确保只有subscribe状态
+        return this.transformAPIData(result.data).filter(ipo => {
+          if (!ipo.subscriptionEndDate) return true;
+          return new Date(ipo.subscriptionEndDate) >= new Date();
+        });
       }
 
       console.warn('[RealTimeData] API返回数据为空');
@@ -101,6 +115,8 @@ class RealTimeDataService {
       subscriptionEndDate: item.subscriptionEndDate || '',
       industry: item.industry || '',
       marketCap: item.marketCap || '',
+      companyValue: item.companyValue || '',
+      totalLots: item.totalLots || 0,
       peRatio: item.peRatio || 0,
       underwriter: item.underwriter || '',
       cornerstone: item.cornerstone || false,
@@ -126,13 +142,13 @@ class RealTimeDataService {
 
   /**
    * 模拟数据（用于演示和开发）
-   * 根据当前日期动态过滤已截止的股票
+   * 根据当前日期动态过滤已截止的股票，只返回正在招股的
    */
   private getMockData(): RealTimeIPOData[] {
     const now = new Date();
 
     // 模拟数据会显示当前可申购的股票（排除已截止的）
-    const mockData: RealTimeIPOData[] = [
+    const allMockData: RealTimeIPOData[] = [
       {
         stockCode: '02701',
         stockName: '国民技术',
@@ -230,7 +246,11 @@ class RealTimeDataService {
       }
     ];
 
-    return mockData;
+    // 只返回正在招股的（申购截止日期未过期）
+    return allMockData.filter(ipo => {
+      if (!ipo.subscriptionEndDate) return true;
+      return new Date(ipo.subscriptionEndDate) >= now;
+    });
   }
 
   /**

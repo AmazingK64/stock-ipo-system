@@ -150,8 +150,8 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
 
   if (plans.length === 0) {
     return (
-      <Card title={<Space><TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} /><Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A级及以上且仍在申购期)</Text></Space>}>
-        <Empty description="暂无符合条件的A级及以上新股，或已过申购截止日期" />
+      <Card title={<Space><TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} /><Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A-级及以上且仍在申购期)</Text></Space>}>
+        <Empty description="暂无符合条件的A-级及以上新股，或已过申购截止日期" />
       </Card>
     );
   }
@@ -161,7 +161,7 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
       title={
         <Space>
           <TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} />
-          <Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A级及以上且仍在申购期)</Text>
+          <Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A-级及以上且仍在申购期)</Text>
         </Space>
       }
       style={{ marginBottom: 32 }}

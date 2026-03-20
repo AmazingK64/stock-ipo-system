@@ -10,8 +10,8 @@ import {
   RiseOutlined,
   ClockCircleOutlined
 } from '@ant-design/icons';
-import type { RealtimeQuote } from '../types';
-import { ipoColumns, quoteColumns, type ExtendedIPOStock } from './IPOColumns';
+import type { RealtimeQuote, IPOStock } from '../types';
+import { getIPOColumns, quoteColumns, type ExtendedIPOStock } from './IPOColumns';
 
 // Tab数据接口
 interface TabData {
@@ -25,11 +25,15 @@ interface IPOTabsProps {
   groupedStocks: TabData;
   loading: boolean;
   rowKey?: string;
+  onScoreClick?: (record: IPOStock) => void;
 }
 
 /** Tab配置 */
 export const createIPOTabItems = (props: IPOTabsProps) => {
-  const { groupedStocks, loading, rowKey = 'id' } = props;
+  const { groupedStocks, loading, rowKey = 'id', onScoreClick } = props;
+
+  // 获取带有评分点击回调的列配置
+  const ipoColumns = getIPOColumns(onScoreClick || (() => {}));
 
   return [
     {

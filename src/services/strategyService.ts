@@ -530,20 +530,20 @@ class StrategyService {
   }
 
   /**
-   * 过滤A等级以上的新股(排除已截止申购的)
+   * 过滤A-等级以上的新股(排除已截止申购的)
    */
   filterAGradeOrAbove(ipoStocks: IPOStock[]): IPOStock[] {
     const now = new Date();
-    
+
     return ipoStocks.filter(ipo => {
       const adjustedScore = this.recalculateScoreWithUnderwriter(ipo);
-      // A-及以上等级(评分>=70)
-      const isAGrade = adjustedScore >= 70 || ipo.grade === 'A+' || ipo.grade === 'A';
-      
+      // A-及以上等级(评分>=85)
+      const isAGrade = adjustedScore >= 85 || ipo.grade === 'A+' || ipo.grade === 'A' || ipo.grade === 'A-';
+
       // 检查申购是否已截止（支持精确到小时的时间判断）
       const subscriptionEnd = new Date(ipo.subscriptionEndDate);
       const isStillSubscribing = subscriptionEnd > now;
-      
+
       return isAGrade && isStillSubscribing;
     });
   }

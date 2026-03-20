@@ -21,10 +21,19 @@ const RealTimeMarginData: React.FC = () => {
     setLoading(true);
     try {
       const realTimeData = await realTimeDataService.fetchRealTimeIPOData();
-      setData(realTimeData);
+
+      // 前端额外过滤：确保只展示正在招股的股票（申购截止日期未过期）
+      const now = new Date();
+      const activeData = realTimeData.filter(ipo => {
+        if (!ipo.subscriptionEndDate) return true;
+        return new Date(ipo.subscriptionEndDate) >= now;
+      });
+
+      setData(activeData);
       setLastUpdate(new Date().toLocaleString('zh-CN'));
     } catch (error) {
       console.error('加载实时数据失败:', error);
+      // 获取失败时不清空data，保留上次的数据
     } finally {
       setLoading(false);
     }

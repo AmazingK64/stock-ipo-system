@@ -8,7 +8,7 @@ import { Card, Tabs, Space, Typography } from 'antd';
 import { TrophyOutlined } from '@ant-design/icons';
 import type { IPOStock, RealtimeQuote } from '../types';
 import { createIPOTabItems } from './IPOTabs';
-import type { ExtendedIPOStock } from './IPOColumns';
+import { ScoreDetailModal, type ExtendedIPOStock } from './IPOColumns';
 
 const { Text } = Typography;
 
@@ -27,6 +27,14 @@ interface GroupedStocks {
 
 const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = [] }) => {
   const [activeTab, setActiveTab] = useState<string>('upcoming');
+  const [scoreDetailVisible, setScoreDetailVisible] = useState(false);
+  const [selectedIPO, setSelectedIPO] = useState<IPOStock | null>(null);
+
+  /** 点击评分显示详情 */
+  const handleScoreClick = (record: IPOStock) => {
+    setSelectedIPO(record);
+    setScoreDetailVisible(true);
+  };
 
   /** 根据状态分组股票 */
   const groupedStocks = useMemo(() => {
@@ -88,7 +96,8 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = 
   const tabItems = createIPOTabItems({
     groupedStocks,
     loading,
-    rowKey: 'id'
+    rowKey: 'id',
+    onScoreClick: handleScoreClick
   });
 
   /** 统计数据 */
@@ -97,29 +106,38 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = 
   const subscribeCount = groupedStocks.subscribe.length;
 
   return (
-    <Card
-      title={
-        <Space>
-          <TrophyOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-          <Text strong style={{ fontSize: 18 }}>新股数据</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            (共 {totalCount} 只 | 申购中 {subscribeCount} 只 | 即将上市 {upcomingCount} 只)
-          </Text>
-        </Space>
-      }
-      style={{
-        marginBottom: 24,
-        borderRadius: 16,
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
-      }}
-    >
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-        size="large"
+    <>
+      <Card
+        title={
+          <Space>
+            <TrophyOutlined style={{ color: '#1890ff', fontSize: 20 }} />
+            <Text strong style={{ fontSize: 18 }}>新股数据</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              (共 {totalCount} 只 | 申购中 {subscribeCount} 只 | 即将上市 {upcomingCount} 只)
+            </Text>
+          </Space>
+        }
+        style={{
+          marginBottom: 24,
+          borderRadius: 16,
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
+        }}
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          size="large"
+        />
+      </Card>
+
+      {/* 评分详情弹窗 */}
+      <ScoreDetailModal
+        visible={scoreDetailVisible}
+        record={selectedIPO}
+        onClose={() => setScoreDetailVisible(false)}
       />
-    </Card>
+    </>
   );
 };
 

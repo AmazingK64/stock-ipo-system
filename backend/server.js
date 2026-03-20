@@ -10,12 +10,41 @@
 
 const express = require('express');
 const cors = require('cors');
+const net = require('net');
 const etnetScraper = require('./scraper/etnet-scraper-fixed');
 const aastocksScraper = require('./scraper/aastocks-scraper');
+const prospectusScraper = require('./scraper/prospectus-scraper');
 const dataProvider = require('./dataProvider');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+/**
+ * 检测端口是否已被占用
+ * @param {number} port - 要检测的端口
+ * @returns {Promise<boolean>} - true表示端口已被占用，false表示端口可用
+ */
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`[检测] 端口 ${port} 已被占用`);
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+
+    server.once('listening', () => {
+      server.close();
+      resolve(false);
+    });
+
+    server.listen(port);
+  });
+}
 
 // 中间件
 app.use(cors());
@@ -99,6 +128,166 @@ app.get('/api/ipo-list', async (req, res) => {
     });
   } catch (error) {
     console.error('[API] 获取IPO列表失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 获取申购中的IPO数据（仅subscribe状态）
+// 供实时孖展数据组件使用，只返回正在招股的股票
+app.get('/api/subscribe-list', async (req, res) => {
+  const timeout = 15000;
+  try {
+    console.log('[API] 获取申购中的IPO列表(仅subscribe)...');
+
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    // 优先使用静态数据
+    const staticData = await dataProvider.getAllData();
+
+    if (staticData && staticData.subscribeIPOs?.length > 0) {
+      // 根据当前时间再次过滤，确保只返回真正在申购中的
+      const activeSubscriptions = staticData.subscribeIPOs.filter(ipo => {
+        if (!ipo.subscriptionEndDate) return true; // 没有截止日期的保留
+        const endDate = new Date(ipo.subscriptionEndDate);
+        return endDate >= now;
+      });
+
+      console.log(`[API] 申购中数据: ${staticData.subscribeIPOs.length} -> ${activeSubscriptions.length} 条`);
+
+      // 尝试获取孖展数据并合并
+      let mergedWithMargin = activeSubscriptions;
+      try {
+        const marginData = await Promise.race([
+          aastocksScraper.scrapeMarginData(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('孖展数据超时')), timeout))
+        ]).catch(err => {
+          console.warn('[API] 孖展数据获取失败:', err.message);
+          return [];
+        });
+
+        if (marginData && marginData.length > 0) {
+          const marginMap = new Map();
+          marginData.forEach(m => marginMap.set(m.stockCode, m));
+
+          mergedWithMargin = activeSubscriptions.map(ipo => {
+            const margin = marginMap.get(ipo.stockCode);
+            if (margin) {
+              return {
+                ...ipo,
+                marginMultiple: margin.marginMultiple,
+                marginAmount: margin.marginAmount
+              };
+            }
+            return ipo;
+          });
+
+          console.log(`[API] 孖展数据合并: ${marginData.length} 条匹配`);
+        }
+      } catch (err) {
+        console.warn('[API] 孖展数据合并失败:', err.message);
+      }
+
+      // 合并招股书数据（保荐人、基石、营收、利润等）
+      let mergedWithProspectus = mergedWithMargin;
+      try {
+        const stockCodes = mergedWithMargin.map(ipo => ipo.stockCode);
+        const prospectusMergePromises = mergedWithMargin.map(async (ipo) => {
+          try {
+            const prospectusData = await prospectusScraper.ensureProspectusData(ipo.stockCode, ipo);
+            if (prospectusData) {
+              return {
+                ...ipo,
+                // 招股书核心数据覆盖
+                underwriter: prospectusData.underwriter || ipo.underwriter,
+                cornerstone: prospectusData.cornerstone,
+                cornerstoneInvestors: prospectusData.cornerstoneInvestors || [],
+                starInvestors: prospectusData.starInvestors || [],
+                peRatio: prospectusData.peRatio,
+                revenue: prospectusData.revenue,
+                netProfit: prospectusData.netProfit,
+                revenueGrowth: prospectusData.revenueGrowth,
+                profitGrowth: prospectusData.profitGrowth,
+                profitability: prospectusData.profitability,
+                hasGreenshoe: prospectusData.hasGreenshoe,
+                isIndustryLeader: prospectusData.isIndustryLeader,
+                industry: prospectusData.industry || ipo.industry,
+                marketCap: prospectusData.marketCap || ipo.marketCap,
+                companyValue: prospectusData.companyValue || ipo.companyValue,
+                issuePrice: prospectusData.issuePrice || ipo.issuePrice,
+                sharesPerLot: prospectusData.sharesPerLot || ipo.sharesPerLot,
+                offeringShares: prospectusData.offeringShares || ipo.offeringShares,
+                totalLots: prospectusData.totalLots || ipo.totalLots,
+                publicSharesRatio: prospectusData.publicSharesRatio || ipo.publicSharesRatio,
+                description: prospectusData.description || ipo.description,
+              };
+            }
+            return ipo;
+          } catch (err) {
+            console.warn(`[API] 招股书数据合并失败(${ipo.stockCode}):`, err.message);
+            return ipo;
+          }
+        });
+
+        mergedWithProspectus = await Promise.all(prospectusMergePromises);
+
+        const mergedCount = mergedWithProspectus.filter(
+          (ipo, idx) => ipo.profitability !== mergedWithMargin[idx].profitability || 
+                        ipo.starInvestors?.length !== mergedWithMargin[idx].starInvestors?.length
+        ).length;
+        if (mergedCount > 0) {
+          console.log(`[API] 招股书数据合并: ${mergedCount} 条有数据更新`);
+        }
+      } catch (err) {
+        console.warn('[API] 招股书数据合并失败:', err.message);
+      }
+
+      return res.json({
+        success: true,
+        data: mergedWithProspectus,
+        lastUpdate: new Date().toISOString(),
+        source: 'static'
+      });
+    }
+
+    // 降级：爬虫数据
+    console.log('[API] 静态数据为空，尝试爬虫数据...');
+    const [etnetData, aastocksData] = await Promise.all([
+      Promise.race([
+        etnetScraper.scrapeAll(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('ETNet超时')), timeout))
+      ]).catch(err => {
+        console.warn('[API] ETNet获取失败:', err.message);
+        return null;
+      }),
+
+      Promise.race([
+        aastocksScraper.scrapeAll(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('AASTOCKS超时')), timeout))
+      ]).catch(err => {
+        console.warn('[API] AASTOCKS获取失败:', err.message);
+        return null;
+      })
+    ]);
+
+    const mergedData = mergeAndFilterIPOData(etnetData, aastocksData, null, now, today);
+
+    // 只返回subscribe状态的
+    const subscribeData = mergedData.filter(ipo => ipo.status === 'subscribe');
+
+    console.log(`[API] 申购中数据(爬虫): 共 ${subscribeData.length} 条`);
+
+    res.json({
+      success: true,
+      data: subscribeData,
+      lastUpdate: new Date().toISOString(),
+      source: 'scraper'
+    });
+  } catch (error) {
+    console.error('[API] 获取申购中数据失败:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -660,9 +849,28 @@ function getHigherPriorityStatus(status1, status2) {
   return p1 >= p2 ? status1 : status2;
 }
 
-// 启动服务器
-app.listen(PORT, () => {
-  console.log(`
+// 启动服务器（带端口检测）
+async function startServer() {
+  // 检测端口是否已被占用
+  const portInUse = await isPortInUse(PORT);
+
+  if (portInUse) {
+    console.log(`
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║   ⏭️  端口 ${PORT} 已被占用，后端服务已在运行中              ║
+║                                                           ║
+║   📡 API地址: http://localhost:${PORT}                      ║
+║                                                           ║
+║   如果需要重启，请先停止已有的服务                         ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+    `);
+    return; // 不再启动新服务
+  }
+
+  app.listen(PORT, () => {
+    console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   🚀 港股IPO数据爬虫后端服务已启动                         ║
@@ -671,6 +879,7 @@ app.listen(PORT, () => {
 ║                                                           ║
 ║   📋 可用接口:                                            ║
 ║   • GET /api/ipo-list       - 获取IPO列表(已过滤已上市)    ║
+║   • GET /api/subscribe-list - 获取申购中的IPO列表          ║
 ║   • GET /api/ipo-all        - 获取完整分类IPO数据         ║
 ║   • GET /api/margin-data    - 获取孖展数据                ║
 ║   • GET /api/subscription    - 获取申购数据               ║
@@ -684,28 +893,31 @@ app.listen(PORT, () => {
 ║   • AASTOCKS (孖展数据)                                    ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
-  `);
+    `);
 
-  // 启动时加载数据
-  console.log('[启动] 正在加载初始数据...');
+    // 启动时加载数据
+    console.log('[启动] 正在加载初始数据...');
 
-  dataProvider.getAllData().then(staticData => {
-    cachedData.categorizedData = {
-      subscribeIPOs: staticData.subscribeIPOs || [],
-      upcomingIPOs: staticData.upcomingIPOs || [],
-      todayListed: staticData.todayListed || [],
-      recentListed: staticData.recentListed || [],
-      updateTime: staticData.updateTime || new Date().toISOString(),
-      source: 'static'
-    };
-    cachedData.lastUpdate = new Date().toISOString();
+    dataProvider.getAllData().then(staticData => {
+      cachedData.categorizedData = {
+        subscribeIPOs: staticData.subscribeIPOs || [],
+        upcomingIPOs: staticData.upcomingIPOs || [],
+        todayListed: staticData.todayListed || [],
+        recentListed: staticData.recentListed || [],
+        updateTime: staticData.updateTime || new Date().toISOString(),
+        source: 'static'
+      };
+      cachedData.lastUpdate = new Date().toISOString();
 
-    console.log(`[启动] 初始数据加载完成:`);
-    console.log(`  - 申购中: ${cachedData.categorizedData.subscribeIPOs.length} 只`);
-    console.log(`  - 即将上市: ${cachedData.categorizedData.upcomingIPOs.length} 只`);
-    console.log(`  - 今日上市: ${cachedData.categorizedData.todayListed.length} 只`);
+      console.log(`[启动] 初始数据加载完成:`);
+      console.log(`  - 申购中: ${cachedData.categorizedData.subscribeIPOs.length} 只`);
+      console.log(`  - 即将上市: ${cachedData.categorizedData.upcomingIPOs.length} 只`);
+      console.log(`  - 今日上市: ${cachedData.categorizedData.todayListed.length} 只`);
+    });
   });
-});
+}
+
+startServer();
 
 // 错误处理
 process.on('uncaughtException', (error) => {

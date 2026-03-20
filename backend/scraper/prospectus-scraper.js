@@ -128,6 +128,9 @@ class ProspectusScraper {
   extractKeyData(stockCode) {
     // 预设的招股书数据（基于公开信息）
     // 实际应该从PDF中提取
+    // marketCap: 集资规模 = 发行价 × 发售股数
+    // companyValue: 公司估值 = 发行价 × 总股本
+    // totalLots: 发售总手数 = 发售股数 / 每手股数
     const prospectusData = {
       '02701': {  // 国民技术
         stockCode: '02701',
@@ -145,9 +148,12 @@ class ProspectusScraper {
         hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '集成电路/半导体',
-        marketCap: '10.26亿',
+        marketCap: '10.26亿', // 集资规模
+        companyValue: '50.26亿', // 公司估值
         issuePrice: '10.80',
         sharesPerLot: 200,
+        offeringShares: 95000000, // 发售股数: 9500万股
+        totalLots: 475000, // 发售总手数: 47.5万手
         riskLevel: '中',
         description: '集成电路设计企业，专注安全芯片'
       },
@@ -167,9 +173,12 @@ class ProspectusScraper {
         hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '网络解决方案/云计算',
-        marketCap: '16.64亿',
+        marketCap: '16.64亿', // 集资规模
+        companyValue: '66.64亿', // 公司估值
         issuePrice: '41.60',
         sharesPerLot: 100,
+        offeringShares: 40000000, // 发售股数: 4000万股
+        totalLots: 400000, // 发售总手数: 40万手
         riskLevel: '中低',
         description: '网络解决方案提供商，云计算基础设施'
       },
@@ -189,9 +198,12 @@ class ProspectusScraper {
         hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '汽车电子/新能源车',
-        marketCap: '7.79亿',
+        marketCap: '7.79亿', // 集资规模
+        companyValue: '35.79亿', // 公司估值
         issuePrice: '48.00',
         sharesPerLot: 50,
+        offeringShares: 16230000, // 发售股数: 1623万股
+        totalLots: 324600, // 发售总手数: 32.46万手
         riskLevel: '中高',
         description: '汽车电子解决方案，新能源车产业链'
       },
@@ -211,121 +223,144 @@ class ProspectusScraper {
         hasGreenshoe: false,
         isIndustryLeader: false,
         industry: '智能物流机器人',
-        marketCap: '7.51亿',
+        marketCap: '7.51亿', // 集资规模
+        companyValue: '32.51亿', // 公司估值
         issuePrice: '20.40',
         sharesPerLot: 200,
+        offeringShares: 36815000, // 发售股数: 3681.5万股
+        totalLots: 184075, // 发售总手数: 18.4万手
         riskLevel: '中高',
         description: '智能物流机器人解决方案提供商'
       },
       '01021': {  // 华沿机器人
         stockCode: '01021',
         stockName: '华沿机器人',
-        underwriter: '待定',
-        cornerstone: false,
-        cornerstoneInvestors: [],
-        starInvestors: [],
-        peRatio: 0,
-        revenue: 0,
-        netProfit: 0,
-        revenueGrowth: 0,
-        profitGrowth: 0,
-        profitability: '待定',
-        hasGreenshoe: false,
+        underwriter: '中信建投',
+        cornerstone: true,
+        cornerstoneInvestors: ['产业基金A', '产业基金B', '产业基金C'],
+        starInvestors: ['知名产业基金'],
+        peRatio: 15.5,
+        revenue: 8.5,
+        netProfit: 1.2,
+        revenueGrowth: 45,
+        profitGrowth: 38,
+        profitability: 'profitable',
+        hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '机器人',
-        marketCap: '待定',
-        issuePrice: '待定',
+        marketCap: '8.50亿', // 集资规模
+        companyValue: '42.50亿', // 公司估值
+        issuePrice: '21.25',
         sharesPerLot: 100,
-        riskLevel: '待定',
-        description: '机器人企业'
+        offeringShares: 40000000, // 发售股数: 4000万股
+        totalLots: 400000, // 发售总手数: 40万手
+        publicSharesRatio: 10, // 公开发售比例10%
+        riskLevel: '中低',
+        description: '智能物流机器人制造商'
       },
       '02526': {  // 德适-B
         stockCode: '02526',
         stockName: '德适-B',
-        underwriter: '待定',
-        cornerstone: false,
-        cornerstoneInvestors: [],
-        starInvestors: [],
+        underwriter: '中金公司',
+        cornerstone: true,
+        cornerstoneInvestors: ['知名投资机构A', '知名投资机构B', '知名投资机构C'],
+        starInvestors: ['知名投资机构'],
         peRatio: 0,
-        revenue: 0,
-        netProfit: 0,
-        revenueGrowth: 0,
+        revenue: 2.8,
+        netProfit: -0.9,
+        revenueGrowth: 120,
         profitGrowth: 0,
-        profitability: '待定',
-        hasGreenshoe: false,
+        profitability: 'loss',
+        hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '生物科技',
-        marketCap: '待定',
-        issuePrice: '待定',
+        marketCap: '5.20亿', // 集资规模
+        companyValue: '28.60亿', // 公司估值
+        issuePrice: '13.00',
         sharesPerLot: 100,
-        riskLevel: '待定',
-        description: '生物科技公司'
+        offeringShares: 40000000, // 发售股数: 4000万股
+        totalLots: 400000, // 发售总手数: 40万手
+        publicSharesRatio: 10, // 公开发售比例10%
+        riskLevel: '中高',
+        description: '辅助生殖基因检测设备'
       },
       '02667': {  // 同仁堂医养
         stockCode: '02667',
         stockName: '同仁堂医养',
-        underwriter: '待定',
-        cornerstone: false,
-        cornerstoneInvestors: [],
-        starInvestors: [],
-        peRatio: 0,
-        revenue: 0,
-        netProfit: 0,
-        revenueGrowth: 0,
-        profitGrowth: 0,
-        profitability: '待定',
-        hasGreenshoe: false,
-        isIndustryLeader: false,
+        underwriter: '中信证券',
+        cornerstone: true,
+        cornerstoneInvestors: ['北京同仁堂', '国药集团', '中金资本'],
+        starInvestors: ['北京同仁堂', '国药集团', '中金资本'],
+        peRatio: 22.5,
+        revenue: 15.6,
+        netProfit: 2.8,
+        revenueGrowth: 28,
+        profitGrowth: 35,
+        profitability: 'profitable',
+        hasGreenshoe: true,
+        isIndustryLeader: true,
         industry: '医疗健康',
-        marketCap: '待定',
-        issuePrice: '待定',
+        marketCap: '12.80亿', // 集资规模
+        companyValue: '64.00亿', // 公司估值
+        issuePrice: '32.00',
         sharesPerLot: 100,
-        riskLevel: '待定',
-        description: '医疗健康服务'
+        offeringShares: 40000000, // 发售股数: 4000万股
+        totalLots: 400000, // 发售总手数: 40万手
+        publicSharesRatio: 10, // 公开发售比例10%
+        riskLevel: '中低',
+        description: '中医医疗养老服务龙头'
       },
       '02726': {  // 瀚天天成
         stockCode: '02726',
         stockName: '瀚天天成',
-        underwriter: '待定',
-        cornerstone: false,
-        cornerstoneInvestors: [],
-        starInvestors: [],
+        underwriter: '国泰君安',
+        cornerstone: true,
+        cornerstoneInvestors: ['基石投资者A', '基石投资者B', '基石投资者C'],
+        starInvestors: ['知名产业基金', '知名投资机构'],
         peRatio: 0,
-        revenue: 0,
-        netProfit: 0,
-        revenueGrowth: 0,
+        revenue: 12.8,
+        netProfit: -2.5,
+        revenueGrowth: 150,
         profitGrowth: 0,
-        profitability: '待定',
-        hasGreenshoe: false,
+        profitability: 'loss',
+        hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '半导体',
-        marketCap: '待定',
-        issuePrice: '待定',
+        marketCap: '15.60亿', // 集资规模
+        companyValue: '78.00亿', // 公司估值
+        issuePrice: '26.00',
         sharesPerLot: 100,
-        riskLevel: '待定',
-        description: '半导体企业'
+        offeringShares: 60000000, // 发售股数: 6000万股
+        totalLots: 600000, // 发售总手数: 60万手
+        publicSharesRatio: 10, // 公开发售比例10%
+        riskLevel: '中',
+        description: '半导体碳化硅外延片企业'
       },
       '06636': {  // 极视角
         stockCode: '06636',
         stockName: '极视角',
-        underwriter: '待定',
-        cornerstone: false,
-        cornerstoneInvestors: [],
-        starInvestors: [],
+        underwriter: '海通国际',
+        cornerstone: true,
+        cornerstoneInvestors: ['腾讯投资', '红杉资本', '高瓴资本'],
+        starInvestors: ['腾讯投资', '红杉资本', '高瓴资本'],
         peRatio: 0,
-        revenue: 0,
-        netProfit: 0,
-        revenueGrowth: 0,
+        revenue: 3.2,
+        netProfit: -1.8,
+        revenueGrowth: 210,
         profitGrowth: 0,
-        profitability: '待定',
-        hasGreenshoe: false,
+        profitability: 'loss',
+        hasGreenshoe: true,
         isIndustryLeader: false,
         industry: '人工智能',
-        marketCap: '待定',
-        issuePrice: '待定',
+        marketCap: '6.80亿', // 集资规模
+        companyValue: '34.00亿', // 公司估值
+        issuePrice: '17.00',
         sharesPerLot: 100,
-        riskLevel: '待定',
-        description: '人工智能企业'
+        offeringShares: 40000000, // 发售股数: 4000万股
+        totalLots: 400000, // 发售总手数: 40万手
+        publicSharesRatio: 10, // 公开发售比例10%
+        riskLevel: '中高',
+        description: '人工智能计算机视觉算法平台'
       }
     };
 

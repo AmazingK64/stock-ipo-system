@@ -3,8 +3,8 @@
  * 包含申购/即将上市、今日上市的列配置
  */
 
-import React from 'react';
-import { Tag, Space, Progress } from 'antd';
+import React, { useState } from 'react';
+import { Tag, Space, Progress, Modal, Divider, Row, Col, Card, Typography } from 'antd';
 import {
   TrophyOutlined,
   FireOutlined,
@@ -12,9 +12,13 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   RiseOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import type { IPOStock } from '../types';
+import ipoScoringService from '../services/ipoScoring';
+
+const { Text } = Typography;
 
 // 扩展的IPOStock类型
 export interface ExtendedIPOStock extends IPOStock {
@@ -72,8 +76,214 @@ const TextDanger: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <span style={{ color: '#ff4d4f' }}>{children}</span>
 );
 
+/** 获取评分详情 */
+export const getScoreDetails = (record: IPOStock): {
+  items: Array<{ label: string; value: number; description: string }>;
+  total: number;
+} => {
+  // 委托给评分服务
+  return ipoScoringService.getScoreDetails(record);
+};
+
+/** 评分详情弹窗组件 */
+export const ScoreDetailModal: React.FC<{
+  visible: boolean;
+  record: IPOStock | null;
+  onClose: () => void;
+}> = ({ visible, record, onClose }) => {
+  if (!record) return null;
+  
+  const { items, total } = getScoreDetails(record);
+  const grade = record.grade || 'N/A';
+  
+  return (
+    <Modal
+      title={
+        <Space>
+          <InfoCircleOutlined style={{ color: '#1890ff' }} />
+          <span>评分详情 - {record.stockCode} {record.stockName}</span>
+        </Space>
+      }
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={950}
+      centered
+    >
+      <div style={{ display: 'flex', gap: 16, maxHeight: 'calc(100vh - 200px)' }}>
+        {/* 左侧: 评分细则 */}
+        <Card 
+          title={<Text strong>评分细则</Text>}
+          size="small"
+          style={{ flex: 1.4 }}
+          styles={{ body: { padding: '12px 16px' } }}
+        >
+          <Space direction="vertical" style={{ width: '100%' }} size="small">
+            {items.map((item, index) => (
+              <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Text strong style={{ width: 60, flexShrink: 0 }}>{item.label}</Text>
+                <Tag color="blue" style={{ flexShrink: 0 }}>
+                  +{item.value}分
+                </Tag>
+                <TextSecondary style={{ fontSize: 12, flex: 1 }}>{item.description}</TextSecondary>
+              </div>
+            ))}
+            <Divider style={{ margin: '8px 0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Text strong style={{ width: 60, flexShrink: 0, fontSize: 14 }}>总分</Text>
+              <Tag color="green" style={{ fontWeight: 'bold' }}>
+                {total}分
+              </Tag>
+              <Tag
+                color={getGradeColor(grade)}
+                icon={getGradeIcon(grade)}
+                style={{ fontWeight: 'bold' }}
+              >
+                {grade}
+              </Tag>
+            </div>
+          </Space>
+        </Card>
+
+        {/* 右侧: 等级说明 */}
+        <Card
+          title={<Text strong>等级说明</Text>}
+          size="small"
+          style={{ flex: 1.2, overflow: 'hidden' }}
+          styles={{ body: { padding: '12px 16px', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' } }}
+        >
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>92分以上</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                顶级优质标的。行业地位领先，市场认可度高；顶级保荐人(中金/中信/摩根士丹利等)；明星投资者加持；估值合理或偏低。
+              </Text>
+              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：可融资申购，积极参与
+              </TextSuccess>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>87-91分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                优质标的。行业前景良好，具有一定竞争力；知名保荐人；有基石投资者；估值处于合理区间。
+              </Text>
+              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：可融资申购，建议参与
+              </TextSuccess>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A-</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>82-86分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                良好标的。行业有一定的成长空间；有保荐人支持，可能有基石投资者；估值相对合理，无明显泡沫。
+              </Text>
+              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：可适度参与，优先现金申购
+              </TextSuccess>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>77-81分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                中上水平。行业前景尚可，但竞争格局一般；保荐人资质普通；投资者参与度有限；估值略高。
+              </Text>
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
+                建议：谨慎参与，优先现金申购
+              </Text>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>62-76分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                中等水平。行业发展空间有限，市场竞争较激烈；保荐人资质一般；估值相对较高。
+              </Text>
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
+                建议：少量参与或不参与
+              </Text>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B-</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>52-61分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                中下水平。行业前景不明朗；缺乏明显竞争优势；保荐人实力有限；估值偏高。
+              </Text>
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#faad14' }}>
+                建议：观望为主
+              </Text>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>42-51分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                较差标的。行业前景欠佳；缺乏核心竞争力；保荐人资质较差；估值明显偏高。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：谨慎或不参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>32-41分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                差标的。行业前景黯淡；竞争力薄弱；保荐人实力不足；估值显著偏高。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：不参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>32分以下</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                风险极高。基本面较差或信息不充分。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：不参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '8px 0' }} />
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              预期收益仅供参考,投资需谨慎
+            </Text>
+          </Space>
+        </Card>
+      </div>
+    </Modal>
+  );
+};
+
 /** 表格列定义 - 申购/即将上市 */
-export const ipoColumns = [
+export const getIPOColumns = (
+  onScoreClick: (record: IPOStock) => void
+) => [
   {
     title: '股票代码',
     dataIndex: 'stockCode',
@@ -85,28 +295,28 @@ export const ipoColumns = [
     title: '股票名称',
     dataIndex: 'stockName',
     key: 'stockName',
-    width: 130,
+    width: 120,
     render: (text: string) => <strong>{text}</strong>
   },
   {
     title: '行业',
     dataIndex: 'industry',
     key: 'industry',
-    width: 120,
+    width: 110,
     render: (text: string) => text ? <Tag color="blue">{text}</Tag> : <TextSecondary>-</TextSecondary>
   },
   {
     title: '发行价',
     dataIndex: 'issuePrice',
     key: 'issuePrice',
-    width: 90,
-    render: (text: string) => <span>HK${text}</span>
+    width: 85,
+    render: (text: string) => text && text !== '待定' ? <span>HK${text}</span> : <TextSecondary>待定</TextSecondary>
   },
   {
     title: '每手股数',
     dataIndex: 'sharesPerLot',
     key: 'sharesPerLot',
-    width: 110,
+    width: 100,
     render: (sharesPerLot: number, record: IPOStock) => {
       const issuePrice = parseFloat(record.issuePrice) || 0;
       const lots = sharesPerLot || 100;
@@ -115,37 +325,70 @@ export const ipoColumns = [
         <Space direction="vertical" size={0}>
           <strong style={{ color: '#1890ff' }}>{lots}股/手</strong>
           <TextSecondary style={{ fontSize: 11 }}>
-            HK${entryFee.toFixed(2)}
+            {issuePrice > 0 ? `HK${entryFee.toFixed(0)}` : '-'}
           </TextSecondary>
         </Space>
       );
     }
   },
   {
-    title: '市值',
+    title: '集资规模',
     dataIndex: 'marketCap',
     key: 'marketCap',
-    width: 90,
-    render: (text: string) => <TextSecondary>{text || '-'}</TextSecondary>
+    width: 95,
+    render: (text: string) => text && text !== '待定' ? <TextSecondary>{text}</TextSecondary> : <TextSecondary>-</TextSecondary>
+  },
+  {
+    title: '公司估值',
+    dataIndex: 'companyValue',
+    key: 'companyValue',
+    width: 95,
+    render: (text: string) => text && text !== '待定' ? <TextSecondary>{text}</TextSecondary> : <TextSecondary>-</TextSecondary>
+  },
+  {
+    title: '发售手数',
+    dataIndex: 'totalLots',
+    key: 'totalLots',
+    width: 95,
+    render: (totalLots: number) => {
+      if (!totalLots || totalLots === 0) return <TextSecondary>-</TextSecondary>;
+      return (
+        <TextSecondary>
+          {totalLots >= 10000 
+            ? `${(totalLots / 10000).toFixed(1)}万手` 
+            : `${totalLots}手`}
+        </TextSecondary>
+      );
+    }
   },
   {
     title: '保荐人',
     dataIndex: 'underwriter',
     key: 'underwriter',
-    width: 100,
-    render: (text: string) => text ? <Tag color="purple">{text}</Tag> : <TextSecondary>-</TextSecondary>
+    width: 95,
+    render: (text: string) => text && text !== '待定' ? <Tag color="purple">{text}</Tag> : <TextSecondary>-</TextSecondary>
   },
   {
     title: '评分',
     dataIndex: 'score',
     key: 'score',
-    width: 120,
-    render: (score: number) => (
-      <Progress
-        percent={score || 0}
-        size="small"
-        strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
-      />
+    width: 110,
+    render: (score: number, record: IPOStock) => (
+      <div 
+        style={{ cursor: 'pointer' }}
+        onClick={() => onScoreClick(record)}
+      >
+        <Progress
+          percent={score || 0}
+          size="small"
+          strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
+          format={(percent) => (
+            <span style={{ fontSize: 12 }}>
+              {percent}分 <InfoCircleOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+            </span>
+          )}
+        />
+      </div>
     ),
     sorter: (a: IPOStock, b: IPOStock) => (a.score || 0) - (b.score || 0),
   },
@@ -153,15 +396,20 @@ export const ipoColumns = [
     title: '等级',
     dataIndex: 'grade',
     key: 'grade',
-    width: 80,
-    render: (grade: string) => (
-      <Tag
-        color={getGradeColor(grade)}
-        icon={getGradeIcon(grade)}
-        style={{ fontSize: 14, padding: '4px 8px', fontWeight: 'bold' }}
+    width: 70,
+    render: (grade: string, record: IPOStock) => (
+      <div 
+        style={{ cursor: 'pointer' }}
+        onClick={() => onScoreClick(record)}
       >
-        {grade || 'N/A'}
-      </Tag>
+        <Tag
+          color={getGradeColor(grade)}
+          icon={getGradeIcon(grade)}
+          style={{ fontSize: 14, padding: '4px 8px', fontWeight: 'bold' }}
+        >
+          {grade || 'N/A'}
+        </Tag>
+      </div>
     ),
   },
   {
@@ -197,6 +445,9 @@ export const ipoColumns = [
     }
   }
 ];
+
+// 保留旧的导出以兼容
+export const ipoColumns = getIPOColumns(() => {});
 
 /** 表格列定义 - 今日上市(实时行情) */
 export const quoteColumns = [
