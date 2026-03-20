@@ -3,136 +3,223 @@ import type { IPOStock, Allocation, IRawIPOData, IPOStrategy } from '../types';
 
 // 港股新股信息获取服务
 class IPOService {
+  private apiBaseURL = 'http://localhost:3001/api';
 
   /**
-   * 获取新股信息 - 2026年3月17日最新数据
+   * 获取新股信息
+   * 优先从后端API获取真实数据，降级到模拟数据
    */
   async fetchNewIPOStocks(): Promise<IRawIPOData[]> {
     try {
-      // 真实的港股新股数据 (2026年3月17日)
-      const realIPOData: IRawIPOData[] = [
-        // 第一批次: 3月20日上市
-        {
-          stockCode: '01989',
-          stockName: '广合科技',
-          listingDate: '2026-03-20',
-          issuePrice: '71.88',
-          subscriptionStartDate: '2026-03-12',
-          subscriptionEndDate: '2026-03-17',
-          industry: '印制电路板',
-          marketCap: '33.06亿',
-          peRatio: 21.2,
-          underwriter: '中信证券',
-          cornerstone: true,
-          starInvestors: ['CPE源峰', '景林资产', '惠理', '霸菱', 'UBS AM', 'Eastspring'],
-          sharesPerLot: 100, // 每手100股
-          hasGreenshoe: true, // 有绿鞋
-          isIndustryLeader: true, // 行业龙头
-          profitability: 'profitable',
-          revenue: 28.5,
-          netProfit: 3.2,
-          revenueGrowth: 0.35,
-          profitGrowth: 0.42
-        },
-        
-        // 第二批次: 3月23日上市
-        {
-          stockCode: '03355',
-          stockName: '飞速创新',
-          listingDate: '2026-03-23',
-          issuePrice: '41.60',
-          subscriptionStartDate: '2026-03-13',
-          subscriptionEndDate: '2026-03-18T09:00:00', // 3月18日早上9点截止
-          industry: '网络解决方案 云计算',
-          marketCap: '16.64亿',
-          peRatio: 18.5,
-          underwriter: '中金公司',
-          cornerstone: true,
-          starInvestors: ['Hao Fund', 'Great Holding', 'WT Asset Management', 'Caitong SEIII', '聚鸣', '凯丰'],
-          sharesPerLot: 100, // 每手100股
-          hasGreenshoe: true, // 有绿鞋
-          isIndustryLeader: false,
-          profitability: 'profitable',
-          revenue: 12.3,
-          netProfit: 1.8,
-          revenueGrowth: 0.65,
-          profitGrowth: 0.58
-        },
-        {
-          stockCode: '02701',
-          stockName: '国民技术',
-          listingDate: '2026-03-23',
-          issuePrice: '10.80',
-          subscriptionStartDate: '2026-03-13',
-          subscriptionEndDate: '2026-03-18',
-          industry: '集成电路 半导体',
-          marketCap: '10.26亿',
-          peRatio: 0, // 亏损企业
-          underwriter: '中信证券',
-          cornerstone: true,
-          starInvestors: ['国华人寿', 'Harvest Oriental II', '欣旺达财资'],
-          sharesPerLot: 200, // 每手200股
-          hasGreenshoe: true, // 有绿鞋
-          isIndustryLeader: false,
-          profitability: 'loss', // 亏损
-          revenue: 5.8,
-          netProfit: -0.8,
-          revenueGrowth: 1.2, // 营收增长120%
-          profitGrowth: 0
-        },
-        
-        // 第三批次: 3月24日上市
-        {
-          stockCode: '02729',
-          stockName: '凯乐士科技',
-          listingDate: '2026-03-24',
-          issuePrice: '20.40',
-          subscriptionStartDate: '2026-03-16',
-          subscriptionEndDate: '2026-03-19',
-          industry: '智能物流机器人',
-          marketCap: '7.51亿',
-          peRatio: 0, // 亏损企业
-          underwriter: '国泰君安',
-          cornerstone: false,
-          starInvestors: [],
-          sharesPerLot: 200, // 每手200股
-          hasGreenshoe: false, // 无绿鞋
-          isIndustryLeader: false,
-          profitability: 'loss',
-          revenue: 3.2,
-          netProfit: -0.5,
-          revenueGrowth: 0.85,
-          profitGrowth: 0
-        },
-        {
-          stockCode: '02632',
-          stockName: '泽景股份',
-          listingDate: '2026-03-24',
-          issuePrice: '48.00',
-          subscriptionStartDate: '2026-03-16',
-          subscriptionEndDate: '2026-03-19',
-          industry: '汽车电子 新能源车',
-          marketCap: '7.79亿',
-          peRatio: 0, // 亏损企业
-          underwriter: '海通国际',
-          cornerstone: true,
-          starInvestors: ['盈科壹号', '香港高精尖'],
-          sharesPerLot: 50, // 每手50股
-          hasGreenshoe: true, // 有绿鞋
-          isIndustryLeader: false,
-          profitability: 'loss',
-          revenue: 4.5,
-          netProfit: -0.6,
-          revenueGrowth: 0.95,
-          profitGrowth: 0
-        }
-      ];
-
-      return realIPOData;
+      // 尝试从后端API获取真实数据
+      const realData = await this.fetchFromBackend();
+      if (realData.length > 0) {
+        console.log('[IPOService] 使用后端API获取真实数据，共', realData.length, '条');
+        return realData;
+      }
     } catch (error) {
-      console.error('获取新股信息失败:', error);
-      return [];
+      console.warn('[IPOService] 后端API不可用，使用模拟数据:', error);
     }
+
+    // 降级到模拟数据
+    console.log('[IPOService] 使用模拟数据（请启动后端服务以获取真实数据）');
+    return this.getMockData();
+  }
+
+  /**
+   * 从后端API获取数据
+   */
+  private async fetchFromBackend(): Promise<IRawIPOData[]> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+      const response = await fetch(`${this.apiBaseURL}/ipo-list`, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`API响应错误: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data && result.data.length > 0) {
+        // 将API数据转换为IRawIPOData格式
+        return this.transformAPIData(result.data);
+      }
+
+      return [];
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.warn('[IPOService] API请求超时');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 转换API数据为IRawIPOData格式
+   */
+  private transformAPIData(apiData: any[]): IRawIPOData[] {
+    return apiData.map(item => ({
+      stockCode: item.stockCode || '',
+      stockName: item.stockName || '',
+      listingDate: item.listingDate || '',
+      issuePrice: item.issuePrice?.toString() || '0',
+      subscriptionStartDate: item.subscriptionStartDate || '',
+      subscriptionEndDate: item.subscriptionEndDate || '',
+      industry: item.industry || '',
+      marketCap: item.marketCap || '',
+      peRatio: item.peRatio || 0,
+      underwriter: item.underwriter || '',
+      cornerstone: item.cornerstone || false,
+      starInvestors: item.starInvestors || [],
+      sharesPerLot: item.sharesPerLot || 100,
+      hasGreenshoe: item.hasGreenshoe || false,
+      isIndustryLeader: item.isIndustryLeader || false,
+      profitability: item.profitability || 'profitable',
+      revenue: item.revenue || 0,
+      netProfit: item.netProfit || 0,
+      revenueGrowth: item.revenueGrowth || 0,
+      profitGrowth: item.profitGrowth || 0
+    }));
+  }
+
+  /**
+   * 模拟数据（用于演示和开发）
+   * 根据当前日期动态过滤已截止的股票
+   */
+  private getMockData(): IRawIPOData[] {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    // 模拟数据会根据当前日期动态生成
+    const mockData: IRawIPOData[] = [
+      // 第一批次: 3月20日上市 - 已截止
+      {
+        stockCode: '01989',
+        stockName: '广合科技',
+        listingDate: '2026-03-20',
+        issuePrice: '71.88',
+        subscriptionStartDate: '2026-03-12',
+        subscriptionEndDate: '2026-03-17',
+        industry: '印制电路板',
+        marketCap: '33.06亿',
+        peRatio: 21.2,
+        underwriter: '中信证券',
+        cornerstone: true,
+        starInvestors: ['CPE源峰', '景林资产', '惠理', '霸菱', 'UBS AM', 'Eastspring'],
+        sharesPerLot: 100,
+        hasGreenshoe: true,
+        isIndustryLeader: true,
+        profitability: 'profitable',
+        revenue: 28.5,
+        netProfit: 3.2,
+        revenueGrowth: 0.35,
+        profitGrowth: 0.42
+      },
+
+      // 第二批次: 3月23日上市 - 已截止（3月18日早上9点）
+      {
+        stockCode: '03355',
+        stockName: '飞速创新',
+        listingDate: '2026-03-23',
+        issuePrice: '41.60',
+        subscriptionStartDate: '2026-03-13',
+        subscriptionEndDate: '2026-03-18T09:00:00',
+        industry: '网络解决方案 云计算',
+        marketCap: '16.64亿',
+        peRatio: 18.5,
+        underwriter: '中金公司',
+        cornerstone: true,
+        starInvestors: ['Hao Fund', 'Great Holding', 'WT Asset Management', 'Caitong SEIII', '聚鸣', '凯丰'],
+        sharesPerLot: 100,
+        hasGreenshoe: true,
+        isIndustryLeader: false,
+        profitability: 'profitable',
+        revenue: 12.3,
+        netProfit: 1.8,
+        revenueGrowth: 0.65,
+        profitGrowth: 0.58
+      },
+      // 国民技术 - 今天截止
+      {
+        stockCode: '02701',
+        stockName: '国民技术',
+        listingDate: '2026-03-23',
+        issuePrice: '10.80',
+        subscriptionStartDate: '2026-03-13',
+        subscriptionEndDate: '2026-03-18',
+        industry: '集成电路 半导体',
+        marketCap: '10.26亿',
+        peRatio: 0,
+        underwriter: '中信证券',
+        cornerstone: true,
+        starInvestors: ['国华人寿', 'Harvest Oriental II', '欣旺达财资'],
+        sharesPerLot: 200,
+        hasGreenshoe: true,
+        isIndustryLeader: false,
+        profitability: 'loss',
+        revenue: 5.8,
+        netProfit: -0.8,
+        revenueGrowth: 1.2,
+        profitGrowth: 0
+      },
+
+      // 第三批次: 3月24日上市 - 明天截止
+      {
+        stockCode: '02729',
+        stockName: '凯乐士科技',
+        listingDate: '2026-03-24',
+        issuePrice: '20.40',
+        subscriptionStartDate: '2026-03-16',
+        subscriptionEndDate: '2026-03-19',
+        industry: '智能物流机器人',
+        marketCap: '7.51亿',
+        peRatio: 0,
+        underwriter: '国泰君安',
+        cornerstone: false,
+        starInvestors: [],
+        sharesPerLot: 200,
+        hasGreenshoe: false,
+        isIndustryLeader: false,
+        profitability: 'loss',
+        revenue: 3.2,
+        netProfit: -0.5,
+        revenueGrowth: 0.85,
+        profitGrowth: 0
+      },
+      {
+        stockCode: '02632',
+        stockName: '泽景股份',
+        listingDate: '2026-03-24',
+        issuePrice: '48.00',
+        subscriptionStartDate: '2026-03-16',
+        subscriptionEndDate: '2026-03-19',
+        industry: '汽车电子 新能源车',
+        marketCap: '7.79亿',
+        peRatio: 0,
+        underwriter: '海通国际',
+        cornerstone: true,
+        starInvestors: ['盈科壹号', '香港高精尖'],
+        sharesPerLot: 50,
+        hasGreenshoe: true,
+        isIndustryLeader: false,
+        profitability: 'loss',
+        revenue: 4.5,
+        netProfit: -0.6,
+        revenueGrowth: 0.95,
+        profitGrowth: 0
+      }
+    ];
+
+    return mockData;
   }
 
   /**

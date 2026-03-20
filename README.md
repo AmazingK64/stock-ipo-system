@@ -88,19 +88,59 @@ git clone https://github.com/AmazingK64/stock-ipo-system.git
 # 进入项目目录
 cd stock-ipo-system
 
-# 安装依赖
+# 安装前端依赖
 npm install
 
-# 启动开发服务器
-npm run dev
-
-# 构建生产版本
-npm run build
+# 安装后端依赖（用于获取真实数据）
+cd backend && npm install && cd ..
 ```
 
-### 访问地址
+### 启动服务
 
-开发环境: http://localhost:5173
+#### 方式一：只启动前端（使用模拟数据）
+
+```bash
+npm run dev
+```
+
+访问地址: http://localhost:5173
+
+#### 方式二：同时启动前端和后端（推荐，获取真实数据）
+
+```bash
+# 终端1：启动后端爬虫服务
+npm run backend
+
+# 终端2：启动前端
+npm run dev
+```
+
+或者一次性启动（需要两个终端）：
+
+```bash
+# 终端1：启动后端和前端
+npm run start:all
+```
+
+### 后端服务说明
+
+后端服务运行在 **http://localhost:3001**，提供以下API：
+
+| 接口 | 说明 |
+|------|------|
+| `GET /api/ipo-list` | 获取IPO列表（从AiPO、HKEX等数据源） |
+| `GET /api/margin-data` | 获取孖展数据 |
+| `GET /api/subscription-data` | 获取申购数据 |
+| `GET /api/cached-data` | 获取缓存数据 |
+| `GET /api/health` | 健康检查 |
+
+如果后端服务未启动，前端会自动降级到模拟数据。
+
+### 构建生产版本
+
+```bash
+npm run build
+```
 
 ---
 
