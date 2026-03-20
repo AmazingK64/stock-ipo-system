@@ -1,6 +1,6 @@
-import React from 'react';
-import { Card, Table, Tag, Progress, Space, Typography } from 'antd';
-import { TrophyOutlined, FireOutlined, WarningOutlined } from '@ant-design/icons';
+import React, { useState, useMemo } from 'react';
+import { Card, Table, Tag, Progress, Space, Typography, Switch, Alert } from 'antd';
+import { TrophyOutlined, FireOutlined, WarningOutlined, ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import type { IPOStock } from '../types';
 
 const { Text } = Typography;
@@ -11,6 +11,26 @@ interface IPOListProps {
 }
 
 const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading }) => {
+  const [hideClosed, setHideClosed] = useState(true); // 默认隐藏已截止股票
+
+  // 过滤已截止股票
+  const filteredStocks = useMemo(() => {
+    const now = new Date();
+    if (!hideClosed) {
+      return ipoStocks;
+    }
+    return ipoStocks.filter(ipo => {
+      const subscriptionEnd = new Date(ipo.subscriptionEndDate);
+      return subscriptionEnd > now;
+    });
+  }, [ipoStocks, hideClosed]);
+
+  // 统计已截止股票数量
+  const closedCount = useMemo(() => {
+    const now = new Date();
+    return ipoStocks.filter(ipo => new Date(ipo.subscriptionEndDate) <= now).length;
+  }, [ipoStocks]);
+
   const getGradeColor = (grade: string): string => {
     if (grade.startsWith('A')) return '#52c41a';
     if (grade.startsWith('B')) return '#1890ff';
@@ -23,6 +43,11 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading }) => {
     if (grade.startsWith('B')) return <FireOutlined style={{ color: '#1890ff' }} />;
     if (grade.startsWith('C')) return <WarningOutlined style={{ color: '#faad14' }} />;
     return <WarningOutlined style={{ color: '#ff4d4f' }} />;
+  };
+
+  // 判断股票是否已截止
+  const isClosed = (subscriptionEndDate: string): boolean => {
+    return new Date(subscriptionEndDate) <= new Date();
   };
 
   const columns = [
@@ -166,17 +191,24 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading }) => {
       title: '申购日期',
       dataIndex: 'subscriptionStartDate',
       key: 'subscriptionDate',
-      width: 180,
-      render: (_: any, record: IPOStock) => (
-        <Space direction="vertical" size={0}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            开始: {record.subscriptionStartDate}
-          </Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            结束: {record.subscriptionEndDate}
-          </Text>
-        </Space>
-      )
+      width: 200,
+      render: (_: any, record: IPOStock) => {
+        const closed = isClosed(record.subscriptionEndDate);
+        return (
+          <Space direction="vertical" size={0}>
+            <Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {record.subscriptionStartDate} ~ {record.subscriptionEndDate}
+              </Text>
+              {closed ? (
+                <Tag color="default" icon={<ClockCircleOutlined />}>已截止</Tag>
+              ) : (
+                <Tag color="success" icon={<CheckCircleOutlined />}>申购中</Tag>
+              )}
+            </Space>
+          </Space>
+        );
+      }
     },
     {
       title: '上市日期',
@@ -192,17 +224,34 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading }) => {
         <Space>
           <TrophyOutlined style={{ color: '#1890ff', fontSize: 20 }} />
           <Text strong style={{ fontSize: 18 }}>新股打新推荐</Text>
+          {closedCount > 0 && (
+            <Tag color="default">{closedCount}只已截止</Tag>
+          )}
         </Space>
       }
-      style={{ 
+      extra={
+        <Space>
+          <Text type="secondary">隐藏已截止</Text>
+          <Switch size="small" checked={hideClosed} onChange={setHideClosed} />
+        </Space>
+      }
+      style={{
         marginBottom: 24,
         borderRadius: 16,
         boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
       }}
     >
+      {hideClosed && closedCount > 0 && (
+        <Alert
+          message={`已隐藏 ${closedCount} 只已截止申购的新股，切换右上角开关可查看全部`}
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Table
         columns={columns}
-        dataSource={ipoStocks}
+        dataSource={filteredStocks}
         rowKey="id"
         loading={loading}
         pagination={{
