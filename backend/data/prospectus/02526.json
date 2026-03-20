@@ -1,0 +1,22 @@
+{
+  "stockCode": "02526",
+  "stockName": "德适-B",
+  "underwriter": "中金公司",
+  "cornerstone": true,
+  "cornerstoneInvestors": ["奥博资本", "康桥资本", "维梧资本"],
+  "starInvestors": ["奥博资本", "康桥资本", "维梧资本"],
+  "peRatio": 0,
+  "revenue": 2.8,
+  "netProfit": -1.5,
+  "revenueGrowth": 1.2,
+  "profitGrowth": 0,
+  "profitability": "loss",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "生物科技",
+  "marketCap": "12亿",
+  "issuePrice": "12.80",
+  "sharesPerLot": 100,
+  "riskLevel": "高",
+  "description": "生物科技公司，专注创新药物研发（B类公司）"
+}

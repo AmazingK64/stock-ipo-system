@@ -14,9 +14,7 @@ class Scheduler {
   start(): void {
     console.log('定时任务启动: 每24小时刷新一次新股数据');
     
-    // 立即执行一次
-    this.refreshData();
-    
+    // 不再立即执行，避免和 loadData 重复
     // 设置定时任务
     this.intervalId = setInterval(() => {
       this.refreshData();

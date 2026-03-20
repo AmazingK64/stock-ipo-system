@@ -1,0 +1,30 @@
+{
+  "stockCode": "02701",
+  "stockName": "国民技术",
+  "underwriter": "中信证券",
+  "cornerstone": true,
+  "cornerstoneInvestors": [
+    "国华人寿",
+    "Harvest Oriental II",
+    "欣旺达财资"
+  ],
+  "starInvestors": [
+    "国华人寿",
+    "Harvest Oriental II",
+    "欣旺达财资"
+  ],
+  "peRatio": 0,
+  "revenue": 5.8,
+  "netProfit": -0.8,
+  "revenueGrowth": 1.2,
+  "profitGrowth": 0,
+  "profitability": "loss",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "集成电路/半导体",
+  "marketCap": "10.26亿",
+  "issuePrice": "10.80",
+  "sharesPerLot": 200,
+  "riskLevel": "中",
+  "description": "集成电路设计企业，专注安全芯片"
+}

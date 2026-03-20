@@ -1,0 +1,22 @@
+{
+  "stockCode": "06636",
+  "stockName": "极视角",
+  "underwriter": "海通国际",
+  "cornerstone": true,
+  "cornerstoneInvestors": ["腾讯投资", "红杉资本", "高瓴资本"],
+  "starInvestors": ["腾讯投资", "红杉资本", "高瓴资本"],
+  "peRatio": 0,
+  "revenue": 6.5,
+  "netProfit": -2.2,
+  "revenueGrowth": 2.1,
+  "profitGrowth": 0,
+  "profitability": "loss",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "人工智能",
+  "marketCap": "20亿",
+  "issuePrice": "18.00",
+  "sharesPerLot": 100,
+  "riskLevel": "中高",
+  "description": "人工智能算法平台，专注计算机视觉"
+}

@@ -1,3 +1,6 @@
+/** IPO状态枚举 */
+export type IPOStatus = 'subscribe' | 'upcoming' | 'today_listed' | 'recent_listed' | 'unknown';
+
 // 新股信息接口
 export interface IPOStock {
   id?: number;
@@ -25,6 +28,9 @@ export interface IPOStock {
   grade: string;
   strategy: IPOStrategy;
   dataDate?: string; // 数据日期(YYYY-MM-DD格式)
+  // IPO状态
+  status?: IPOStatus;
+  daysToListing?: number; // 距上市天数
   // A+H股相关
   hasAShare?: boolean; // 是否有A股
   aShareCode?: string; // A股代码
@@ -34,6 +40,31 @@ export interface IPOStock {
   industryHistoryReturn?: number; // 同行业历史平均涨幅
   similarCompanies?: SimilarCompany[]; // 同类公司历史数据
   createdAt: string;
+}
+
+/** 实时行情数据 */
+export interface RealtimeQuote {
+  stockCode: string;
+  stockName: string;
+  currentPrice: string;    // 当前价
+  change: string;          // 涨跌额
+  changeRate: string;       // 涨跌幅
+  issuePrice: string;      // 发行价/上市价
+  openingPrice: string;    // 开市价
+  highPrice: string;       // 最高价
+  lowPrice: string;        // 最低价
+  turnover: string;        // 成交额
+  currency?: string;        // 货币
+}
+
+/** 分类IPO数据(后端API返回) */
+export interface CategorizedIPOData {
+  upcomingIPOs: IPOStock[];
+  subscribeIPOs: IPOStock[];
+  todayListed: RealtimeQuote[];
+  recentListed: IPOStock[];
+  updateTime: string;
+  source: string;
 }
 
 // 同类公司历史数据
@@ -70,6 +101,7 @@ export interface Allocation {
   stockCode: string;
   stockName: string;
   listingDate?: string;
+  subscriptionEndDate?: string; // 申购截止日期
   capitalAllocation: number;
   financingAmount: number;
   financingMultiplier: number;
@@ -110,4 +142,6 @@ export interface IRawIPOData {
   netProfit: number; // 净利润(亿元)
   revenueGrowth: number; // 营收增长率
   profitGrowth: number; // 净利润增长率
+  status?: IPOStatus; // IPO状态(从后端返回)
+  daysToListing?: number; // 距上市天数
 }

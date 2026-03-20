@@ -1,0 +1,22 @@
+{
+  "stockCode": "02729",
+  "stockName": "凯乐士科技",
+  "underwriter": "国泰君安",
+  "cornerstone": false,
+  "cornerstoneInvestors": [],
+  "starInvestors": [],
+  "peRatio": 0,
+  "revenue": 3.2,
+  "netProfit": -0.5,
+  "revenueGrowth": 0.85,
+  "profitGrowth": 0,
+  "profitability": "loss",
+  "hasGreenshoe": false,
+  "isIndustryLeader": false,
+  "industry": "智能物流机器人",
+  "marketCap": "7.51亿",
+  "issuePrice": "20.40",
+  "sharesPerLot": 200,
+  "riskLevel": "中高",
+  "description": "智能物流机器人解决方案提供商"
+}

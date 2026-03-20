@@ -9,7 +9,7 @@ import RealTimeMarginData from './components/RealTimeMarginData';
 import ipoService from './services/ipoService';
 import db from './db/database';
 import scheduler from './utils/scheduler';
-import type { IPOStock } from './types';
+import type { IPOStock, RealtimeQuote } from './types';
 import './App.css';
 
 const { Header, Content, Footer } = Layout;
@@ -18,6 +18,7 @@ const { Title, Text } = Typography;
 const App: React.FC = () => {
   const [capital, setCapital] = useState<number>(0);
   const [ipoStocks, setIPOStocks] = useState<IPOStock[]>([]);
+  const [realtimeQuotes, setRealtimeQuotes] = useState<RealtimeQuote[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
@@ -25,7 +26,7 @@ const App: React.FC = () => {
     loadData();
     // 启动定时任务
     scheduler.start();
-    
+
     // 组件卸载时停止定时任务
     return () => {
       scheduler.stop();
@@ -36,32 +37,36 @@ const App: React.FC = () => {
     setLoading(true);
     const capitalAmount = await ipoService.getCapital();
     let stocks = await ipoService.getAllIPOStocks();
-    
+
     // 检查是否有重复数据
     const stockCodes = stocks.map(s => s.stockCode);
     const hasDuplicates = stockCodes.length !== new Set(stockCodes).size;
-    
+
     // 检查数据日期是否是今天
     const today = new Date().toISOString().split('T')[0];
-    const needRefresh = stocks.length === 0 || 
-                        hasDuplicates || 
-                        !stocks[0].dataDate || 
+    const needRefresh = stocks.length === 0 ||
+                        hasDuplicates ||
+                        !stocks[0].dataDate ||
                         stocks[0].dataDate !== today;
-    
+
     if (needRefresh) {
       // 只在需要时刷新数据(静默刷新,不显示消息)
-      console.log('需要刷新数据:', { 
-        hasData: stocks.length > 0, 
-        hasDuplicates, 
-        dataDate: stocks[0]?.dataDate, 
-        today 
+      console.log('需要刷新数据:', {
+        hasData: stocks.length > 0,
+        hasDuplicates,
+        dataDate: stocks[0]?.dataDate,
+        today
       });
       await refreshIPOData(false);
       stocks = await ipoService.getAllIPOStocks();
     } else {
       console.log('使用历史数据,无需刷新');
     }
-    
+
+    // 获取今日上市实时行情
+    const quotes = await ipoService.fetchTodayListedQuotes();
+    setRealtimeQuotes(quotes);
+
     setCapital(capitalAmount);
     setIPOStocks(stocks);
     setLoading(false);
@@ -76,6 +81,9 @@ const App: React.FC = () => {
           message.success('新股数据刷新成功');
         }
         const stocks = await ipoService.getAllIPOStocks();
+        // 同时刷新实时行情
+        const quotes = await ipoService.fetchTodayListedQuotes();
+        setRealtimeQuotes(quotes);
         setIPOStocks(stocks);
       } else {
         if (showMessage) {
@@ -178,7 +186,7 @@ const App: React.FC = () => {
             
             <AllocationStrategy capital={capital} ipoStocks={ipoStocks} />
             
-            <IPOList ipoStocks={ipoStocks} loading={loading} />
+            <IPOList ipoStocks={ipoStocks} loading={loading} realtimeQuotes={realtimeQuotes} />
           </div>
         </Content>
 

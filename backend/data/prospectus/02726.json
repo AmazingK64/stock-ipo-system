@@ -1,0 +1,22 @@
+{
+  "stockCode": "02726",
+  "stockName": "瀚天天成",
+  "underwriter": "国泰君安",
+  "cornerstone": true,
+  "cornerstoneInvestors": ["华登国际", "中芯聚源", "武岳峰资本"],
+  "starInvestors": ["华登国际", "中芯聚源"],
+  "peRatio": 0,
+  "revenue": 4.2,
+  "netProfit": -0.8,
+  "revenueGrowth": 1.5,
+  "profitGrowth": 0,
+  "profitability": "loss",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "半导体",
+  "marketCap": "18亿",
+  "issuePrice": "22.50",
+  "sharesPerLot": 100,
+  "riskLevel": "中高",
+  "description": "半导体材料供应商，专注第三代半导体"
+}

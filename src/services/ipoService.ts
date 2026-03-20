@@ -1,5 +1,5 @@
 import db from '../db/database';
-import type { IPOStock, Allocation, IRawIPOData, IPOStrategy } from '../types';
+import type { IPOStock, Allocation, IRawIPOData, IPOStrategy, CategorizedIPOData, RealtimeQuote } from '../types';
 
 // 港股新股信息获取服务
 class IPOService {
@@ -24,6 +24,79 @@ class IPOService {
     // 降级到模拟数据
     console.log('[IPOService] 使用模拟数据（请启动后端服务以获取真实数据）');
     return this.getMockData();
+  }
+
+  /**
+   * 获取分类IPO数据 (新接口)
+   * 返回: 申购中、即将上市、今日上市、近期上市
+   */
+  async fetchCategorizedIPOData(): Promise<CategorizedIPOData | null> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
+      const response = await fetch(`${this.apiBaseURL}/ipo-all`, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`API响应错误: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('[IPOService] 获取分类IPO数据成功');
+        return result as CategorizedIPOData;
+      }
+
+      return null;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn('[IPOService] 分类IPO数据请求超时');
+      }
+      console.warn('[IPOService] 获取分类IPO数据失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 获取今日上市实时行情
+   */
+  async fetchTodayListedQuotes(): Promise<RealtimeQuote[]> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(`${this.apiBaseURL}/today-listed`, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`API响应错误: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        return result.data as RealtimeQuote[];
+      }
+
+      return [];
+    } catch (error) {
+      console.warn('[IPOService] 获取今日上市行情失败:', error);
+      return [];
+    }
   }
 
   /**
@@ -55,8 +128,8 @@ class IPOService {
       }
 
       return [];
-    } catch (error) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.warn('[IPOService] API请求超时');
       }
       throw error;
@@ -87,7 +160,9 @@ class IPOService {
       revenue: item.revenue || 0,
       netProfit: item.netProfit || 0,
       revenueGrowth: item.revenueGrowth || 0,
-      profitGrowth: item.profitGrowth || 0
+      profitGrowth: item.profitGrowth || 0,
+      status: item.status, // 保留后端返回的状态
+      daysToListing: item.daysToListing // 保留距上市天数
     }));
   }
 
@@ -96,9 +171,6 @@ class IPOService {
    * 根据当前日期动态过滤已截止的股票
    */
   private getMockData(): IRawIPOData[] {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-
     // 模拟数据会根据当前日期动态生成
     const mockData: IRawIPOData[] = [
       // 第一批次: 3月20日上市 - 已截止
@@ -360,21 +432,46 @@ class IPOService {
   }
 
   /**
-   * 计算融资分配策略 - 按上市批次分配,资金不冲突
+   * 按申购截止日期分组新股
+   */
+  groupIPOsBySubscriptionEndDate(ipoStocks: IPOStock[]): Map<string, IPOStock[]> {
+    const groups = new Map<string, IPOStock[]>();
+    
+    ipoStocks.forEach(ipo => {
+      // 使用申购截止日期作为分组依据
+      const subscriptionEndDate = ipo.subscriptionEndDate || '未知';
+      if (!groups.has(subscriptionEndDate)) {
+        groups.set(subscriptionEndDate, []);
+      }
+      groups.get(subscriptionEndDate)!.push(ipo);
+    });
+    
+    // 每个分组内按评分排序
+    groups.forEach(group => {
+      group.sort((a, b) => b.score - a.score);
+    });
+    
+    return groups;
+  }
+
+  /**
+   * 计算融资分配策略 - 按申购截止日期批次分配,资金不冲突
    */
   calculateAllocation(totalCapital: number, ipoStocks: IPOStock[]): Allocation[] {
     const allocations: Allocation[] = [];
     
-    // 按上市日期分组
-    const groups = this.groupIPOsByListingDate(ipoStocks);
+    // 按申购截止日期分组
+    const groups = this.groupIPOsBySubscriptionEndDate(ipoStocks);
     
-    // 将分组按上市日期排序
-    const sortedGroups = Array.from(groups.entries()).sort((a, b) => 
-      new Date(a[0]).getTime() - new Date(b[0]).getTime()
-    );
+    // 将分组按申购截止日期排序
+    const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
+      const dateA = a[0] === '未知' ? new Date('9999-12-31') : new Date(a[0]);
+      const dateB = b[0] === '未知' ? new Date('9999-12-31') : new Date(b[0]);
+      return dateA.getTime() - dateB.getTime();
+    });
     
-    // 对每个上市批次进行分配
-    sortedGroups.forEach(([_listingDate, groupIPOs]) => {
+    // 对每个申购批次进行分配
+    sortedGroups.forEach(([_subscriptionEndDate, groupIPOs]) => {
       // 筛选评分B+以上的新股
       const highQualityIPOs = groupIPOs.filter(ipo => ipo.score >= 55);
       
@@ -402,12 +499,19 @@ class IPOService {
           allocationRatio = 0.25;
         }
 
-        // 如果是最后一个,分配剩余所有资金
-        if (index === highQualityIPOs.length - 1) {
+        // 如果是最后一个且剩余资金充足,分配剩余所有资金
+        if (index === highQualityIPOs.length - 1 && remainingCapital > 0) {
           allocationRatio = remainingCapital / totalCapital;
         }
 
-        const capitalAllocation = totalCapital * allocationRatio;
+        // 确保不会分配超过剩余资金
+        const capitalAllocation = Math.min(totalCapital * allocationRatio, remainingCapital);
+        
+        // 如果剩余资金不足以分配,跳过该股票
+        if (capitalAllocation <= 0) {
+          return;
+        }
+        
         const issuePrice = parseFloat(ipo.issuePrice);
         const sharesPerLot = ipo.sharesPerLot; // 每手股数
         
@@ -431,7 +535,7 @@ class IPOService {
           totalSubscription = Math.min(totalSubscription, remainingSubscriptionLimit);
           // 重新计算实际融资倍数
           const actualMultiplier = (totalSubscription / capitalAllocation) - 1;
-          financingMultiplier = Math.floor(actualMultiplier);
+          financingMultiplier = Math.max(0, Math.floor(actualMultiplier));
         }
         
         // 按总申购额计算可申购的手数
@@ -443,7 +547,8 @@ class IPOService {
         const actualAllocation = actualTotalSubscription / (1 + financingMultiplier);
         const financingAmount = actualTotalSubscription - actualAllocation;
         
-        // 更新剩余申购额度
+        // 更新剩余资金和申购额度
+        remainingCapital -= actualAllocation;
         remainingSubscriptionLimit -= actualTotalSubscription;
 
         allocations.push({
@@ -451,6 +556,7 @@ class IPOService {
           stockCode: ipo.stockCode,
           stockName: ipo.stockName,
           listingDate: ipo.listingDate,
+          subscriptionEndDate: ipo.subscriptionEndDate, // 添加申购截止日期
           capitalAllocation: actualAllocation,
           financingAmount: financingAmount,
           financingMultiplier: financingMultiplier,
@@ -459,8 +565,6 @@ class IPOService {
           shares: shares,
           createdAt: new Date().toISOString()
         });
-
-        remainingCapital -= actualAllocation;
       });
     });
 
@@ -559,7 +663,7 @@ class IPOService {
   async refreshIPOData(): Promise<boolean> {
     try {
       const newIPOStocks = await this.fetchNewIPOStocks();
-      await db.ipoStocks.clear();
+      // saveIPOStocks 内部会先清空数据库，不需要重复调用
       await this.saveIPOStocks(newIPOStocks);
       return true;
     } catch (error) {

@@ -26,8 +26,6 @@ interface MarginDataSource {
 
 class RealTimeDataService {
   private apiBaseURL = 'http://localhost:3001/api';
-  private useMockData = true; // 默认使用模拟数据
-  private mockDataLastUpdate: string | null = null;
 
   /**
    * 获取实时IPO数据
@@ -56,7 +54,7 @@ class RealTimeDataService {
   private async fetchFromBackend(): Promise<RealTimeIPOData[]> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
 
       const response = await fetch(`${this.apiBaseURL}/ipo-list`, {
         signal: controller.signal,
@@ -78,12 +76,15 @@ class RealTimeDataService {
         return this.transformAPIData(result.data);
       }
 
+      console.warn('[RealTimeData] API返回数据为空');
       return [];
-    } catch (error) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.warn('[RealTimeData] API请求超时');
+      } else {
+        console.warn('[RealTimeData] API请求失败:', error);
       }
-      throw error;
+      return []; // 返回空数组而不是抛出错误
     }
   }
 
@@ -129,7 +130,6 @@ class RealTimeDataService {
    */
   private getMockData(): RealTimeIPOData[] {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
 
     // 模拟数据会显示当前可申购的股票（排除已截止的）
     const mockData: RealTimeIPOData[] = [
@@ -230,7 +230,6 @@ class RealTimeDataService {
       }
     ];
 
-    this.mockDataLastUpdate = now.toISOString();
     return mockData;
   }
 

@@ -1,0 +1,201 @@
+/**
+ * ETNet IPO数据清洗后的结构化数据
+ * 数据来源: etnet.com.hk
+ * 清洗日期: 2026-03-20
+ */
+
+{
+  "清洗说明": {
+    "原始问题": "爬虫将实时行情、IPO申购数据、行业分类混在一起",
+    "解决方案": "根据HTML结构分区解析，区分数据类型",
+    "过滤内容": [
+      "行业分类条目(半导体、软件服务等)",
+      "实时行情数据(今日上市股票的当前价格)",
+      "字段错位数据(代码被拼接或日期当成价格)"
+    ]
+  },
+
+  "即将上市新股": {
+    "说明": "已结束申购，待上市的新股",
+    "数据": [
+      {
+        "stockCode": "02701",
+        "stockName": "国民技术",
+        "listingDate": "2026-03-23",
+        "issuePrice": "10.80",
+        "subscriptionEndDate": "已截止",
+        "daysToListing": 3,
+        "status": "即将上市",
+        "industry": "",
+        "marketCap": "",
+        "peRatio": 0,
+        "underwriter": "",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "03355",
+        "stockName": "飞速创新",
+        "listingDate": "2026-03-23",
+        "issuePrice": "41.60",
+        "subscriptionEndDate": "已截止",
+        "daysToListing": 3,
+        "status": "即将上市",
+        "industry": "网络解决方案/云计算",
+        "marketCap": "16.64亿",
+        "peRatio": 18.5,
+        "underwriter": "中金公司",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "02632",
+        "stockName": "泽景股份",
+        "listingDate": "2026-03-24",
+        "issuePrice": "48.00",
+        "subscriptionEndDate": "已截止",
+        "daysToListing": 4,
+        "status": "即将上市",
+        "industry": "汽车电子/新能源车",
+        "marketCap": "7.79亿",
+        "peRatio": 0,
+        "underwriter": "海通国际",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "02729",
+        "stockName": "凯乐士科技",
+        "listingDate": "2026-03-24",
+        "issuePrice": "20.40",
+        "subscriptionEndDate": "已截止",
+        "daysToListing": 4,
+        "status": "即将上市",
+        "industry": "智能物流机器人",
+        "marketCap": "7.51亿",
+        "peRatio": 0,
+        "underwriter": "国泰君安",
+        "source": "ETNet"
+      }
+    ]
+  },
+
+  "申购中新股": {
+    "说明": "正在申购中的新股",
+    "数据": [
+      {
+        "stockCode": "01021",
+        "stockName": "华沿机器人",
+        "listingDate": "2026-03-25",
+        "issuePrice": "-",
+        "subscriptionEndDate": "2026-03-30",
+        "daysToListing": 5,
+        "status": "申购中",
+        "industry": "",
+        "marketCap": "",
+        "peRatio": 0,
+        "underwriter": "",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "02526",
+        "stockName": "德适-B",
+        "listingDate": "2026-03-25",
+        "issuePrice": "-",
+        "subscriptionEndDate": "2026-03-30",
+        "daysToListing": 5,
+        "status": "申购中",
+        "industry": "",
+        "marketCap": "",
+        "peRatio": 0,
+        "underwriter": "",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "02667",
+        "stockName": "同仁堂医养",
+        "listingDate": "2026-03-25",
+        "issuePrice": "-",
+        "subscriptionEndDate": "2026-03-30",
+        "daysToListing": 5,
+        "status": "申购中",
+        "industry": "",
+        "marketCap": "",
+        "peRatio": 0,
+        "underwriter": "",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "02726",
+        "stockName": "瀚天天成",
+        "listingDate": "2026-03-25",
+        "issuePrice": "-",
+        "subscriptionEndDate": "2026-03-30",
+        "daysToListing": 5,
+        "status": "申购中",
+        "industry": "",
+        "marketCap": "",
+        "peRatio": 0,
+        "underwriter": "",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "06636",
+        "stockName": "极视角",
+        "listingDate": "2026-03-25",
+        "issuePrice": "-",
+        "subscriptionEndDate": "2026-03-30",
+        "daysToListing": 5,
+        "status": "申购中",
+        "industry": "",
+        "marketCap": "",
+        "peRatio": 0,
+        "underwriter": "",
+        "source": "ETNet"
+      }
+    ]
+  },
+
+  "今日上市": {
+    "说明": "今日上市的股票(实时行情)",
+    "数据": [
+      {
+        "stockCode": "01989",
+        "stockName": "广合科技",
+        "listingDate": "2026-03-20",
+        "issuePrice": "71.88",
+        "currentPrice": "109.300",
+        "change": "+37.420",
+        "changeRate": "+52.06%",
+        "openingPrice": "95.050",
+        "highPrice": "147.900",
+        "lowPrice": "95.000",
+        "turnover": "1.903B",
+        "currency": "HKD",
+        "status": "已上市",
+        "source": "ETNet"
+      }
+    ]
+  },
+
+  "历史新股表现": {
+    "说明": "近期上市的新股(半新股)",
+    "数据": [
+      {
+        "stockCode": "07489",
+        "stockName": "岚图汽车",
+        "listingDate": "2026-03-19",
+        "issuePrice": "0",
+        "subscriptionEndDate": "7.500",
+        "status": "昨日上市",
+        "source": "ETNet"
+      },
+      {
+        "stockCode": "03268",
+        "stockName": "美格智能",
+        "listingDate": "2026-03-10",
+        "issuePrice": "0",
+        "subscriptionEndDate": "28.860",
+        "status": "已上市",
+        "source": "ETNet"
+      }
+    ]
+  }
+}

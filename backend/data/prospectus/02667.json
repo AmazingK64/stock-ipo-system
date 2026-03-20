@@ -1,0 +1,22 @@
+{
+  "stockCode": "02667",
+  "stockName": "同仁堂医养",
+  "underwriter": "中信证券",
+  "cornerstone": true,
+  "cornerstoneInvestors": ["中国人寿", "泰康资产", "嘉实基金"],
+  "starInvestors": ["中国人寿", "泰康资产", "嘉实基金"],
+  "peRatio": 22,
+  "revenue": 15.6,
+  "netProfit": 2.8,
+  "revenueGrowth": 0.35,
+  "profitGrowth": 0.42,
+  "profitability": "profitable",
+  "hasGreenshoe": true,
+  "isIndustryLeader": true,
+  "industry": "医疗健康",
+  "marketCap": "25亿",
+  "issuePrice": "28.00",
+  "sharesPerLot": 100,
+  "riskLevel": "低",
+  "description": "医疗健康服务提供商，同仁堂旗下医养平台"
+}

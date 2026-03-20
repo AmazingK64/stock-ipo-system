@@ -1,0 +1,28 @@
+{
+  "stockCode": "02632",
+  "stockName": "泽景股份",
+  "underwriter": "海通国际",
+  "cornerstone": true,
+  "cornerstoneInvestors": [
+    "盈科壹号",
+    "香港高精尖"
+  ],
+  "starInvestors": [
+    "盈科壹号",
+    "香港高精尖"
+  ],
+  "peRatio": 0,
+  "revenue": 4.5,
+  "netProfit": -0.6,
+  "revenueGrowth": 0.95,
+  "profitGrowth": 0,
+  "profitability": "loss",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "汽车电子/新能源车",
+  "marketCap": "7.79亿",
+  "issuePrice": "48.00",
+  "sharesPerLot": 50,
+  "riskLevel": "中高",
+  "description": "汽车电子解决方案，新能源车产业链"
+}

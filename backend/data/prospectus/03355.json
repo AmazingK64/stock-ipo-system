@@ -1,0 +1,36 @@
+{
+  "stockCode": "03355",
+  "stockName": "飞速创新",
+  "underwriter": "中金公司",
+  "cornerstone": true,
+  "cornerstoneInvestors": [
+    "Hao Fund",
+    "Great Holding",
+    "WT Asset Management",
+    "Caitong SEIII",
+    "聚鸣",
+    "凯丰"
+  ],
+  "starInvestors": [
+    "Hao Fund",
+    "Great Holding",
+    "WT Asset Management",
+    "Caitong SEIII",
+    "聚鸣",
+    "凯丰"
+  ],
+  "peRatio": 18.5,
+  "revenue": 12.3,
+  "netProfit": 1.8,
+  "revenueGrowth": 0.65,
+  "profitGrowth": 0.58,
+  "profitability": "profitable",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "网络解决方案/云计算",
+  "marketCap": "16.64亿",
+  "issuePrice": "41.60",
+  "sharesPerLot": 100,
+  "riskLevel": "中低",
+  "description": "网络解决方案提供商，云计算基础设施"
+}

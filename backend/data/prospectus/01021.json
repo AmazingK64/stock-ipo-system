@@ -1,0 +1,22 @@
+{
+  "stockCode": "01021",
+  "stockName": "华沿机器人",
+  "underwriter": "中信建投",
+  "cornerstone": true,
+  "cornerstoneInvestors": ["深圳高科投", "广州产投", "苏州基金"],
+  "starInvestors": ["深圳高科投", "广州产投"],
+  "peRatio": 25,
+  "revenue": 8.5,
+  "netProfit": 1.2,
+  "revenueGrowth": 0.85,
+  "profitGrowth": 0.65,
+  "profitability": "profitable",
+  "hasGreenshoe": true,
+  "isIndustryLeader": false,
+  "industry": "机器人",
+  "marketCap": "15亿",
+  "issuePrice": "15.50",
+  "sharesPerLot": 100,
+  "riskLevel": "中",
+  "description": "工业机器人解决方案提供商，专注智能制造"
+}

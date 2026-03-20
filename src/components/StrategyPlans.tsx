@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Button, Modal, message, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Button, Modal, message, Empty, Table } from 'antd';
 import {
   TrophyOutlined,
   ThunderboltOutlined,
@@ -76,11 +76,6 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
         onPlanSelect(plan);
       }
     }
-  };
-
-  const showHistoryModal = (stock: IPOStock) => {
-    setSelectedStock(stock);
-    setHistoryModalVisible(true);
   };
 
   const renderHistoryData = (stock: IPOStock) => {
@@ -160,60 +155,6 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
       </Card>
     );
   }
-
-  const columns = [
-    {
-      title: '股票代码',
-      dataIndex: 'stockCode',
-      key: 'stockCode',
-      width: 100,
-      render: (text: string) => <Text strong style={{ color: '#1890ff' }}>{text}</Text>
-    },
-    {
-      title: '股票名称',
-      dataIndex: 'stockName',
-      key: 'stockName',
-      width: 120,
-    },
-    {
-      title: '自有资金',
-      dataIndex: 'capitalAllocation',
-      key: 'capitalAllocation',
-      width: 120,
-      render: (value: number) => <Text strong>{strategyService.formatMoney(value)}</Text>
-    },
-    {
-      title: '融资倍数',
-      dataIndex: 'financingMultiplier',
-      key: 'financingMultiplier',
-      width: 100,
-      render: (value: number) => <Tag color="purple">{value}x</Tag>
-    },
-    {
-      title: '申购总额',
-      dataIndex: 'totalSubscription',
-      key: 'totalSubscription',
-      width: 140,
-      render: (value: number) => <Text strong style={{ color: '#52c41a' }}>{strategyService.formatMoney(value)}</Text>
-    },
-    {
-      title: '申购股数',
-      dataIndex: 'shares',
-      key: 'shares',
-      width: 120,
-      render: (value: number, record: Allocation) => {
-        const ipo = ipoStocks.find(s => s.stockCode === record.stockCode);
-        const sharesPerLot = ipo?.sharesPerLot || 100;
-        const lots = Math.floor(value / sharesPerLot);
-        return (
-          <Space direction="vertical" size={0}>
-            <Text strong>{value.toLocaleString()}股</Text>
-            <Text type="secondary" style={{ fontSize: 11 }}>({lots}手)</Text>
-          </Space>
-        );
-      }
-    }
-  ];
 
   return (
     <Card
