@@ -1,55 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Tag, Space, Typography, Alert, Progress, Statistic, Row, Col } from 'antd';
+import { Card, Table, Tag, Space, Typography, Alert, Progress, Statistic, Row, Col, Empty, Spin } from 'antd';
 import { 
   FireOutlined, 
   ThunderboltOutlined, 
   SyncOutlined,
   InfoCircleOutlined,
   UserOutlined,
-  RiseOutlined
+  RiseOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
-import realTimeDataService, { type RealTimeIPOData } from '../services/realTimeDataService';
+import ipoService from '../services/ipoService';
+import type { IPOStock } from '../types';
 
 const { Text, Title } = Typography;
 
+interface MarginData {
+  stockCode: string;
+  stockName: string;
+  industry: string;
+  marginMultiple?: number;
+  marginAmount?: number;
+  subscriptionEndDate: string;
+  listingDate: string;
+  issuePrice: string;
+  score?: number;
+  grade?: string;
+}
+
 const RealTimeMarginData: React.FC = () => {
-  const [data, setData] = useState<RealTimeIPOData[]>([]);
+  const [data, setData] = useState<MarginData[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [error, setError] = useState<string>('');
 
   const loadData = async () => {
     setLoading(true);
+    setError('');
     try {
-      const realTimeData = await realTimeDataService.fetchRealTimeIPOData();
-
-      // 前端额外过滤：确保只展示正在招股的股票（申购截止日期未过期）
-      const now = new Date();
-      const activeData = realTimeData.filter(ipo => {
-        if (!ipo.subscriptionEndDate) return true;
-        return new Date(ipo.subscriptionEndDate) >= now;
+      const response = await fetch('http://localhost:3001/api/subscribe-list', {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(10000)
       });
-
-      setData(activeData);
-      setLastUpdate(new Date().toLocaleString('zh-CN'));
-    } catch (error) {
+      
+      if (!response.ok) {
+        throw new Error(`API响应错误: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const now = new Date();
+        const activeData = result.data
+          .filter((ipo: any) => {
+            if (!ipo.subscriptionEndDate) return true;
+            return new Date(ipo.subscriptionEndDate) >= now;
+          })
+          .map((ipo: any) => ({
+            stockCode: ipo.stockCode,
+            stockName: ipo.stockName,
+            industry: ipo.industry || '',
+            marginMultiple: ipo.marginMultiple,
+            marginAmount: ipo.marginAmount,
+            subscriptionEndDate: ipo.subscriptionEndDate,
+            listingDate: ipo.listingDate,
+            issuePrice: ipo.issuePrice,
+            score: ipo.score,
+            grade: ipo.grade
+          }));
+        
+        setData(activeData);
+        setLastUpdate(new Date().toLocaleString('zh-CN'));
+      } else {
+        throw new Error('数据为空');
+      }
+    } catch (error: any) {
       console.error('加载实时数据失败:', error);
-      // 获取失败时不清空data，保留上次的数据
+      setError(error.message || '获取数据失败');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // 不再自动请求，等待用户手动点击刷新
+    loadData();
   }, []);
 
-  const getHeatTag = (publicMultiple: number) => {
-    const heat = realTimeDataService.getHeatLevel(0, publicMultiple);
-    return (
-      <Tag color={heat.color} icon={publicMultiple > 50 ? <FireOutlined /> : undefined}>
-        {heat.level}
-      </Tag>
-    );
+  const getHeatTag = (marginMultiple: number) => {
+    if (marginMultiple > 100) return <Tag color="#ff4d4f" icon={<FireOutlined />}>超热门</Tag>;
+    if (marginMultiple > 50) return <Tag color="#fa8c16">热门</Tag>;
+    if (marginMultiple > 20) return <Tag color="#faad14">较热</Tag>;
+    if (marginMultiple > 10) return <Tag color="#52c41a">一般</Tag>;
+    return <Tag color="#1890ff">冷门</Tag>;
+  };
+
+  const getGradeColor = (grade: string) => {
+    const colors: Record<string, string> = {
+      'A+': '#ff4d4f', 'A': '#ff7a45', 'A-': '#fa8c16',
+      'B+': '#faad14', 'B': '#52c41a', 'B-': '#73d13d',
+      'C+': '#1890ff', 'C': '#69c0ff', 'D': '#8c8c8c'
+    };
+    return colors[grade] || '#8c8c8c';
   };
 
   const columns = [
@@ -57,34 +107,47 @@ const RealTimeMarginData: React.FC = () => {
       title: '股票代码',
       dataIndex: 'stockCode',
       key: 'stockCode',
-      width: 100,
+      width: 90,
       render: (text: string) => <Text strong style={{ color: '#1890ff' }}>{text}</Text>
     },
     {
       title: '股票名称',
       dataIndex: 'stockName',
       key: 'stockName',
-      width: 120,
+      width: 100,
     },
     {
       title: '行业',
       dataIndex: 'industry',
       key: 'industry',
-      width: 150,
+      width: 120,
       ellipsis: true,
+    },
+    {
+      title: '评分',
+      dataIndex: 'grade',
+      key: 'grade',
+      width: 80,
+      render: (grade: string, record: MarginData) => (
+        <Tag color={getGradeColor(grade)} style={{ fontWeight: 'bold' }}>
+          {grade || '-'} {record.score ? `(${record.score})` : ''}
+        </Tag>
+      )
     },
     {
       title: '孖展倍数',
       dataIndex: 'marginMultiple',
       key: 'marginMultiple',
-      width: 120,
-      sorter: (a: RealTimeIPOData, b: RealTimeIPOData) => (a.marginMultiple || 0) - (b.marginMultiple || 0),
+      width: 100,
+      sorter: (a: MarginData, b: MarginData) => (a.marginMultiple || 0) - (b.marginMultiple || 0),
       render: (value: number) => {
+        if (!value) return <Text type="secondary">暂无</Text>;
         const color = value > 100 ? '#ff4d4f' : value > 50 ? '#fa8c16' : '#52c41a';
         return (
-          <Text strong style={{ color, fontSize: 14 }}>
-            {value ? `${value.toFixed(1)}x` : '-'}
-          </Text>
+          <Space>
+            <Text strong style={{ color, fontSize: 14 }}>{value.toFixed(1)}x</Text>
+            {getHeatTag(value)}
+          </Space>
         );
       }
     },
@@ -92,80 +155,39 @@ const RealTimeMarginData: React.FC = () => {
       title: '孖展金额',
       dataIndex: 'marginAmount',
       key: 'marginAmount',
-      width: 120,
-      sorter: (a: RealTimeIPOData, b: RealTimeIPOData) => (a.marginAmount || 0) - (b.marginAmount || 0),
-      render: (value: number) => (
-        <Text>{value ? `${value.toFixed(1)}亿` : '-'}</Text>
-      )
+      width: 90,
+      render: (value: number) => value ? <Text>{value.toFixed(1)}亿</Text> : <Text type="secondary">-</Text>
     },
     {
-      title: '公开发售倍数',
-      dataIndex: 'publicSubscriptionMultiple',
-      key: 'publicSubscriptionMultiple',
-      width: 140,
-      sorter: (a: RealTimeIPOData, b: RealTimeIPOData) => 
-        (a.publicSubscriptionMultiple || 0) - (b.publicSubscriptionMultiple || 0),
-      render: (value: number) => {
-        if (!value) return <Text>-</Text>;
-        return (
-          <Space direction="vertical" size={0}>
-            <Text strong style={{ color: value > 100 ? '#ff4d4f' : '#1890ff' }}>
-              {value.toFixed(1)}x
-            </Text>
-            {getHeatTag(value)}
-          </Space>
-        );
-      }
-    },
-    {
-      title: '一手中签率',
-      dataIndex: 'oneHandWinRate',
-      key: 'oneHandWinRate',
-      width: 120,
-      render: (value: number) => {
-        if (!value) return <Text>-</Text>;
-        const percent = (value * 100).toFixed(1);
-        const color = value > 0.5 ? '#52c41a' : value > 0.1 ? '#faad14' : '#ff4d4f';
-        return (
-          <Space direction="vertical" size={0}>
-            <Text strong style={{ color }}>{percent}%</Text>
-            <Progress 
-              percent={parseFloat(percent)} 
-              size="small" 
-              showInfo={false}
-              strokeColor={color}
-            />
-          </Space>
-        );
-      }
-    },
-    {
-      title: '申购人数',
-      dataIndex: 'subscriptionCount',
-      key: 'subscriptionCount',
-      width: 120,
-      render: (value: number) => (
-        <Space>
-          <UserOutlined />
-          <Text>{value ? value.toLocaleString() : '-'}</Text>
-        </Space>
-      )
-    },
-    {
-      title: '招股截止',
+      title: '申购截止',
       dataIndex: 'subscriptionEndDate',
       key: 'subscriptionEndDate',
-      width: 120,
+      width: 100,
       render: (date: string) => {
+        if (!date) return <Text>-</Text>;
         const isNear = new Date(date).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+        const isPassed = new Date(date) < new Date();
         return (
-          <Text type={isNear ? 'danger' : undefined} strong={isNear}>
+          <Text type={isPassed ? 'secondary' : isNear ? 'danger' : undefined} strong={isNear}>
             {date}
           </Text>
         );
       }
+    },
+    {
+      title: '上市日期',
+      dataIndex: 'listingDate',
+      key: 'listingDate',
+      width: 100,
+      render: (date: string) => <Text>{date || '-'}</Text>
     }
   ];
+
+  const hotStocks = data.filter(d => (d.marginMultiple || 0) > 50);
+  const totalMargin = data.reduce((sum, d) => sum + (d.marginAmount || 0), 0);
+  const avgMargin = data.length > 0 
+    ? data.reduce((sum, d) => sum + (d.marginMultiple || 0), 0) / data.length 
+    : 0;
 
   return (
     <Card
@@ -174,93 +196,106 @@ const RealTimeMarginData: React.FC = () => {
           <Space>
             <ThunderboltOutlined style={{ color: '#1890ff', fontSize: 20 }} />
             <Title level={4} style={{ margin: 0 }}>实时孖展数据</Title>
-            <Tag color="blue">数据来源: AiPO / AASTOCKS / ETNet</Tag>
+            <Tag color="blue">申购中: {data.length}只</Tag>
           </Space>
           <Space>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              最后更新: {lastUpdate}
-            </Text>
+            {lastUpdate && <Text type="secondary" style={{ fontSize: 12 }}>更新: {lastUpdate}</Text>}
             <SyncOutlined 
               spin={loading} 
               onClick={loadData}
-              style={{ cursor: 'pointer', color: '#1890ff' }}
+              style={{ cursor: 'pointer', color: '#1890ff', fontSize: 16 }}
             />
           </Space>
         </Space>
       }
       style={{ marginBottom: 24 }}
     >
-      <Alert
-        message="数据说明"
-        description={
-          <Space direction="vertical" size={0}>
-            <Text>• 孖展倍数: 融资认购金额 / 公开发售金额,反映市场申购热度</Text>
-            <Text>• 公开发售倍数: 整体认购金额 / 公开发售金额,包含现金和融资</Text>
-            <Text>• 一手中签率: 申购1手的成功概率,热门股通常低于10%</Text>
-            <Text type="warning">⚠️ 数据每5分钟自动刷新,孖展倍数会随时间变化</Text>
-          </Space>
-        }
-        type="info"
-        showIcon
-        icon={<InfoCircleOutlined />}
-        style={{ marginBottom: 16 }}
-      />
+      {error && (
+        <Alert
+          message="数据获取提示"
+          description={`无法获取实时孖展数据: ${error}。请确保后端服务正在运行。`}
+          type="warning"
+          showIcon
+          icon={<WarningOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
-      {/* 统计概览 */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="正在招股"
-              value={data.length}
-              suffix="只"
-              prefix={<RiseOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="热门股(>50x)"
-              value={data.filter(d => (d.publicSubscriptionMultiple || 0) > 50).length}
-              suffix="只"
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="总孖展金额"
-              value={data.reduce((sum, d) => sum + (d.marginAmount || 0), 0).toFixed(1)}
-              suffix="亿"
-              precision={1}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="平均孖展倍数"
-              value={data.length > 0 
-                ? (data.reduce((sum, d) => sum + (d.marginMultiple || 0), 0) / data.length).toFixed(1)
-                : 0
-              }
-              suffix="x"
-            />
-          </Card>
-        </Col>
-      </Row>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <Spin size="large" />
+          <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>正在获取实时数据...</Text>
+        </div>
+      ) : data.length === 0 ? (
+        <Empty description="暂无申购中的新股" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+      ) : (
+        <>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={6}>
+              <Card size="small" style={{ background: '#f6ffed' }}>
+                <Statistic
+                  title="申购中"
+                  value={data.length}
+                  suffix="只"
+                  prefix={<RiseOutlined style={{ color: '#52c41a' }} />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card size="small" style={{ background: hotStocks.length > 0 ? '#fff2e8' : '#fafafa' }}>
+                <Statistic
+                  title="热门股(>50x)"
+                  value={hotStocks.length}
+                  suffix="只"
+                  valueStyle={{ color: hotStocks.length > 0 ? '#ff4d4f' : '#8c8c8c' }}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card size="small">
+                <Statistic
+                  title="总孖展金额"
+                  value={totalMargin.toFixed(1)}
+                  suffix="亿"
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card size="small">
+                <Statistic
+                  title="平均孖展倍数"
+                  value={avgMargin.toFixed(1)}
+                  suffix="x"
+                />
+              </Card>
+            </Col>
+          </Row>
 
-      <Table
-        columns={columns}
-        dataSource={data}
-        rowKey="stockCode"
-        loading={loading}
-        pagination={false}
-        scroll={{ x: 1200 }}
-        size="small"
-      />
+          <Table
+            columns={columns}
+            dataSource={data}
+            rowKey="stockCode"
+            pagination={false}
+            scroll={{ x: 900 }}
+            size="small"
+          />
+
+          <Alert
+            message="数据说明"
+            description={
+              <Space direction="vertical" size={0}>
+                <Text>• 孖展倍数: 融资认购金额 / 公开发售金额，反映市场申购热度</Text>
+                <Text>• 评分由AI根据行业赛道、基本面、估值等多维度综合评估</Text>
+                <Text type="warning">⚠️ 数据仅供参考，投资需谨慎</Text>
+              </Space>
+            }
+            type="info"
+            showIcon
+            icon={<InfoCircleOutlined />}
+            style={{ marginTop: 16 }}
+          />
+        </>
+      )}
     </Card>
   );
 };

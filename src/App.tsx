@@ -3,7 +3,6 @@ import { Layout, Typography, Button, message, Space, ConfigProvider, Popconfirm,
 import { ReloadOutlined, DeleteOutlined, FileTextOutlined, SettingOutlined } from '@ant-design/icons';
 import CapitalManagement from './components/CapitalManagement';
 import IPOList from './components/IPOList';
-import AllocationStrategy from './components/AllocationStrategy';
 import StrategyPlans from './components/StrategyPlans';
 import RealTimeMarginData from './components/RealTimeMarginData';
 import ipoService from './services/ipoService';
@@ -209,12 +208,9 @@ const App: React.FC = () => {
           <div style={{ maxWidth: 1600, margin: '0 auto' }}>
             <CapitalManagement onCapitalUpdate={handleCapitalUpdate} />
             
-            {/* 实时孖展数据 */}
             <RealTimeMarginData />
             
             <StrategyPlans capital={capital} ipoStocks={ipoStocks} />
-            
-            <AllocationStrategy capital={capital} ipoStocks={ipoStocks} />
             
             <IPOList ipoStocks={ipoStocks} loading={loading} realtimeQuotes={realtimeQuotes} />
           </div>

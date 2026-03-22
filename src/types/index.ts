@@ -30,6 +30,7 @@ export interface IPOStock {
   score: number;
   grade: string;
   strategy: IPOStrategy;
+  llmScoringReason?: string; // LLM评分依据摘要
   dataDate?: string; // 数据日期(YYYY-MM-DD格式)
   // IPO状态
   status?: IPOStatus;

@@ -666,27 +666,25 @@ class HKIPOScoringService {
     });
     total += complianceScore;
 
-    return { items, total };
+    // 如果后端有返回分数，使用后端分数作为总分
+    const finalTotal = ipoData.score ?? total;
+
+    return { items, total: finalTotal };
   }
 
   /**
-   * 根据评分获取等级
+   * 根据评分获取等级（与后端LLM评分标准一致）
    */
   getGrade(score: number): string {
-    if (score >= 90) return 'S';
-    if (score >= 85) return 'A+';
-    if (score >= 80) return 'A';
-    if (score >= 75) return 'A-';
-    if (score >= 70) return 'B+';
+    if (score >= 90) return 'A+';
+    if (score >= 85) return 'A';
+    if (score >= 80) return 'A-';
+    if (score >= 75) return 'B+';
     if (score >= 65) return 'B';
-    if (score >= 60) return 'B-';
-    if (score >= 55) return 'C+';
-    if (score >= 50) return 'C';
-    if (score >= 45) return 'C-';
-    if (score >= 40) return 'D+';
-    if (score >= 35) return 'D';
-    if (score >= 30) return 'D-';
-    return 'F';
+    if (score >= 55) return 'B-';
+    if (score >= 45) return 'C+';
+    if (score >= 35) return 'C';
+    return 'D';
   }
 
   /**

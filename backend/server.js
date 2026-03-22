@@ -87,6 +87,7 @@ const getCurrentDateInfo = () => {
 // 获取所有IPO数据（合并多个数据源）
 app.get('/api/ipo-list', async (req, res) => {
   console.log('[API] /api/ipo-list 请求开始');
+  const timeout = 60000; // 60秒超时（LLM评分需要较长时间）
 
   try {
     // 优先使用静态数据

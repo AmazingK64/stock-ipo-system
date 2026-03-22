@@ -141,6 +141,8 @@ class IPOService {
    * 转换API数据为IRawIPOData格式
    */
   private transformAPIData(apiData: any[]): IRawIPOData[] {
+    console.log('[IPOService] transformAPIData 输入:', apiData.length, '条');
+    console.log('[IPOService] transformAPIData 示例:', apiData.slice(0, 2).map((item: any) => ({ code: item.stockCode, score: item.score, grade: item.grade, reason: item.llmScoringReason?.substring(0, 30) })));
     return apiData.map(item => ({
       stockCode: item.stockCode || '',
       stockName: item.stockName || '',
@@ -592,9 +594,13 @@ class IPOService {
    */
   async refreshIPOData(): Promise<boolean> {
     try {
+      console.log('[IPOService] 开始刷新数据...');
       const newIPOStocks = await this.fetchNewIPOStocks();
+      console.log('[IPOService] 获取到新数据:', newIPOStocks.length, '条');
+      console.log('[IPOService] 数据示例:', newIPOStocks.slice(0, 2).map(s => ({ code: s.stockCode, name: s.stockName, score: s.score, grade: s.grade, reason: s.llmScoringReason?.substring(0, 30) })));
       // saveIPOStocks 内部会先清空数据库，不需要重复调用
       await this.saveIPOStocks(newIPOStocks);
+      console.log('[IPOService] 数据保存完成');
       return true;
     } catch (error) {
       console.error('刷新新股数据失败:', error);

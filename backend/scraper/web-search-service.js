@@ -657,22 +657,34 @@ ${searchContext}
     };
   }
 
+  getGrade(score) {
+    if (score >= 90) return 'A+';
+    if (score >= 85) return 'A';
+    if (score >= 80) return 'A-';
+    if (score >= 75) return 'B+';
+    if (score >= 65) return 'B';
+    if (score >= 55) return 'B-';
+    if (score >= 45) return 'C+';
+    if (score >= 35) return 'C';
+    return 'D';
+  }
+
   normalizeScoringResult(rawResult, ipoData = {}) {
     if (!rawResult || typeof rawResult !== 'object') return null;
     if (typeof rawResult.score !== 'number' || Number.isNaN(rawResult.score)) return null;
     if (rawResult.score < 0 || rawResult.score > 100) return null;
 
+    const score = Math.round(rawResult.score);
+    const grade = this.getGrade(score);
+    
     const fallback = this.buildScoringFallback(ipoData);
-    const normalizedGrade = typeof rawResult.grade === 'string' && rawResult.grade.trim()
-      ? rawResult.grade.trim()
-      : fallback.grade;
     const strategy = rawResult.strategy && typeof rawResult.strategy === 'object'
       ? rawResult.strategy
       : fallback.strategy;
 
     const result = {
-      score: Math.round(rawResult.score),
-      grade: normalizedGrade,
+      score,
+      grade,
       strategy: {
         recommendation: strategy.recommendation || fallback.strategy.recommendation,
         action: strategy.action || fallback.strategy.action,
@@ -694,9 +706,79 @@ ${searchContext}
     console.log(`[WebSearch] 调用LLM评分: ${ipoData.stockCode} ${ipoData.stockName}, URL=${this.aiApiUrl}, Model=${this.aiModel}`);
 
     try {
-      const prompt = `你是一位港股IPO打新评分专家。请仅输出JSON，不要输出其他文本。
+      const prompt = `你是一位资深的港股IPO打新策略专家，拥有丰富的港股打新实战经验。请仅输出JSON，不要输出其他文本。
 
-请根据以下公司数据，输出打新评分（0-100）和申购策略：
+## 评分标准（总分100分）
+
+### 1. 行业赛道质量（25分）
+- 热门赛道（AI、半导体、新能源、机器人、智能驾驶、创新药）：20-25分
+- 成长赛道（云计算、生物医药、消费电子、医疗器械）：15-19分
+- 传统赛道（医疗、教育、零售、餐饮、中医）：8-14分
+- 衰退赛道（房地产、传统金融、传统制造）：0-7分
+- 注意：区分医疗细分领域
+  - 创新药/生物制药：属于热门赛道，高分
+  - 医疗器械/诊断：属于成长赛道，中高分
+  - 传统医疗/中医/诊所：属于传统赛道，低分，多为"捞钱"型IPO
+
+### 2. 公司基本面（25分）
+- 盈利且高增长（营收增长>30%，利润增长>20%）：20-25分
+- 盈利但增长缓慢：12-19分
+- 亏损但有明确盈利路径：8-14分
+- 亏损且无盈利预期：0-7分
+- **特别说明**：
+  - 热门赛道（AI、半导体、机器人、新能源、创新药）的亏损公司：不因亏损扣分，重点关注营收增长率和市场地位
+  - 这些行业的初创公司亏损是正常的，市场更看重成长性和赛道前景
+  - 如果是热门赛道+亏损+高增长（营收增长>50%）：仍可给15-20分
+
+### 3. 估值合理性（20分）
+- 估值便宜（PE低于同行业30%以上）：16-20分
+- 估值合理（PE接近同行业）：10-15分
+- 估值偏高（PE高于同行业20-50%）：5-9分
+- 估值昂贵（PE高于同行业50%以上）：0-4分
+
+### 4. 发行结构（15分）
+- 有知名基石+明星投资者+绿鞋：12-15分
+- 有基石或明星投资者：8-11分
+- 无特殊结构：5-7分
+- 公开发售比例极低（<10%）：扣3-5分
+
+### 5. 保荐人质量（10分）
+- 一线保荐人（中金、摩根、高盛、大摩）：8-10分
+- 二线保荐人（中信、华泰、招银）：5-7分
+- 其他保荐人：2-4分
+
+### 6. 市场情绪（5分）
+- 孖展倍数>100倍：5分
+- 孖展倍数50-100倍：4分
+- 孖展倍数10-50倍：2-3分
+- 孖展倍数<10倍：0-1分
+
+## 特别扣分项
+- 传统医疗/中医/诊所类公司：-5到-10分（行业赛道差，多为捞钱型IPO）
+- 传统行业转型概念：-3到-5分
+- 市值过小（<5亿）：-3分
+- 无基石投资者：-3分
+- 热门赛道但营收增长<20%：-3分（说明竞争力不足）
+
+## 特别加分项
+- 创新药/生物制药（有管线、有临床进展）：+5分
+- 医疗器械（有核心技术）：+3分
+- 热门赛道+亏损+高增长（营收增长>50%）：+5分（成长性溢价）
+- 有知名基石投资者（腾讯、阿里、红杉、高瓴等）：+3分
+- 孖展倍数>100倍：+3分（市场认可度高）
+
+## 评级标准
+- A+ (90-100): 强烈推荐，必打
+- A (85-89): 重点推荐，可重仓
+- A- (80-84): 推荐申购
+- B+ (75-79): 可参与，中等仓位
+- B (65-74): 谨慎参与，小仓位
+- B- (55-64): 观望为主
+- C+ (45-54): 不建议参与
+- C (35-44): 风险较高
+- D (<35): 强烈不推荐
+
+## 公司数据
 ${JSON.stringify({
   stockCode: ipoData.stockCode,
   stockName: ipoData.stockName,
@@ -720,20 +802,17 @@ ${JSON.stringify({
   businessModel: ipoData.businessModel,
   moatLevel: ipoData.moatLevel,
   valuationLevel: ipoData.valuationLevel,
-  businessModelReason: ipoData.businessModelReason,
-  moatReason: ipoData.moatReason,
-  valuationReason: ipoData.valuationReason,
   ahDiscount: ipoData.ahDiscount
 }, null, 2)}
 
-JSON格式如下：
+## 输出格式
 {
   "score": 0-100之间数字,
   "grade": "A+|A|A-|B+|B|B-|C+|C|D",
-  "reasoning": "一句话说明评分核心依据",
+  "reasoning": "一句话说明评分核心依据（要具体，比如：行业赛道差+估值偏高+无基石，典型的捞钱型IPO）",
   "strategy": {
-    "recommendation": "总体建议",
-    "action": "具体操作",
+    "recommendation": "总体建议（强烈推荐/推荐/谨慎/观望/不推荐）",
+    "action": "具体操作建议",
     "riskLevel": "低|中|中高|高",
     "expectedReturn": "低|中|中高|高"
   }
@@ -742,10 +821,10 @@ JSON格式如下：
       const response = await axios.post(this.aiApiUrl, {
         model: this.aiModel,
         messages: [
-          { role: 'system', content: '你是港股IPO策略专家，只返回JSON格式结果，不要使用markdown。' },
+          { role: 'system', content: '你是港股IPO打新策略专家，只返回JSON格式结果，不要使用markdown代码块。评分要客观严格，不要给平庸的公司高分。' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.2,
+        temperature: 0.3,
         max_tokens: 900
       }, {
         headers: {

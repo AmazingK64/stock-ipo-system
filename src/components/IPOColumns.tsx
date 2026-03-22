@@ -80,7 +80,7 @@ const TextDanger: React.FC<{ children: React.ReactNode; style?: React.CSSPropert
 
 /** 获取评分详情 */
 export const getScoreDetails = (record: IPOStock): {
-  items: Array<{ label: string; value: number; maxScore: number; description: string }>;
+  items: Array<{ label: string; value: number; maxScore: number; description: string; reason?: string }>;
   total: number;
 } => {
   // 委托给评分服务
@@ -236,93 +236,80 @@ export const ScoreDetailModal: React.FC<{
         >
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
             <Text type="secondary" style={{ fontSize: 11, marginBottom: 4, display: 'block' }}>
-              评分维度: 赛道与细分行业(20) + 公司规模(15) + 业绩与成长性(18) + 估值与定价(15) + 发行中介与结构(22) + 合规与风险(10)
+              评分维度: 行业赛道(25) + 公司基本面(25) + 估值合理性(20) + 发行结构(15) + 保荐人(10) + 市场情绪(5)
             </Text>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#f50" style={{ fontWeight: 'bold', flexShrink: 0 }}>S</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>80分以上</Text>
+                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>A+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>90-100分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                顶级优质港股标的。赛道稀缺且成长空间巨大；顶级发行中介阵容；业绩持续高增长；估值显著低于同行；合规记录完美。
+                顶级优质标的。热门赛道+高增长+明星保荐人+估值合理+基石强大。
               </Text>
               <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：全力融资申购，重仓配置
+                建议：强烈推荐，积极融资申购
               </TextSuccess>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A+</Tag>
+                <Tag color="#ff7a45" style={{ fontWeight: 'bold', flexShrink: 0 }}>A</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>85-89分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                优质标的。赛道前景好+基本面扎实+保荐人靠谱+估值合理。
+              </Text>
+              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：推荐申购，可适度融资
+              </TextSuccess>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#fa8c16" style={{ fontWeight: 'bold', flexShrink: 0 }}>A-</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>80-84分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                良好标的。赛道有成长性+基本面稳定+估值可接受。
+              </Text>
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
+                建议：可参与申购，现金为主
+              </Text>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>B+</Tag>
                 <Text type="secondary" style={{ fontSize: 11 }}>75-79分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                顶级港股标的。赛道前景明确且竞争格局良好；强大发行中介支持；业绩稳定增长；估值合理或略低于同行。
-              </Text>
-              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：积极融资申购，中等仓位
-              </TextSuccess>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>70-74分</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                优质港股标的。赛道具备成长性；有知名保荐人支持；业绩表现良好；估值与行业相当；风险较低。
+                中上标的。赛道一般但有亮点，或赛道好但有瑕疵。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
-                建议：融资申购为主，关注市场情绪
+                建议：谨慎参与，小仓位现金申购
               </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>65-69分</Text>
+                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>B</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>65-74分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                良好港股标的。赛道有成长空间；有保荐人支持；商业模式清晰，护城河中等；估值合理或略高。
-              </Text>
-              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
-                建议：现金申购为主，适量融资
-              </Text>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>60-64分</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中上港股标的。赛道有成长潜力；保荐人资质中等；商业模式可行；估值略高或合理；需关注风险点。
-              </Text>
-              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
-                建议：现金申购为主，少量融资
-              </Text>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>55-59分</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中等港股标的。行业竞争激烈；保荐人资质一般；商业模式普通；估值偏高；存在一定风险。
+                中等标的。传统行业或基本面一般，估值偏高。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#faad14' }}>
-                建议：少量现金申购，保持关注
+                建议：观望为主，少量参与
               </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>50-54分</Text>
+                <Tag color="#73d13d" style={{ fontWeight: 'bold', flexShrink: 0 }}>B-</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>55-64分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中下港股标的。行业前景一般；缺乏明显优势；保荐人实力有限；估值明显偏高；风险较高。
+                中下标的。行业前景一般，缺乏明显优势，估值偏高。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#faad14' }}>
                 建议：谨慎参与或不参与
@@ -331,11 +318,11 @@ export const ScoreDetailModal: React.FC<{
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>45-49分</Text>
+                <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>C+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>45-54分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                较差港股标的。行业前景不明；商业模式不清晰；保荐人资质较差；估值显著偏高；多风险因素。
+                较差标的。行业前景不明，商业模式不清晰，多风险因素。
               </Text>
               <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：不推荐申购
@@ -344,11 +331,11 @@ export const ScoreDetailModal: React.FC<{
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>40-44分</Text>
+                <Tag color="#69c0ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>C</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>35-44分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                差港股标的。行业前景黯淡；竞争力弱；保荐人实力不足；估值昂贵；重大风险暴露。
+                差标的。行业前景黯淡，竞争力弱，估值昂贵，重大风险暴露。
               </Text>
               <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：不参与
@@ -357,63 +344,11 @@ export const ScoreDetailModal: React.FC<{
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>35-39分</Text>
+                <Tag color="#8c8c8c" style={{ fontWeight: 'bold', flexShrink: 0 }}>D</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>0-34分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                风险较高标的。基本面问题较多；发行结构复杂；估值过高；合规风险高。
-              </Text>
-              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：坚决不参与
-              </TextDanger>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>30-34分</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                高风险标的。多风险因素并存；盈利前景差；发行结构不合理；合规问题。
-              </Text>
-              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：避免参与
-              </TextDanger>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>25-29分</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                极高风险标的。基本面严重问题；发行风险高；重大合规瑕疵；商业模式不可持续。
-              </Text>
-              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：坚决不参与
-              </TextDanger>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>20-24分</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                极高风险标的。多重大风险；不建议申购；存在退市风险。
-              </Text>
-              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：坚决不参与
-              </TextDanger>
-            </div>
-            <Divider style={{ margin: '4px 0' }} />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#8c8c8c" style={{ fontWeight: 'bold', flexShrink: 0 }}>F</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>20分以下</Text>
-              </div>
-              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                不合格标的。基本面或发行存在重大缺陷；不建议申购；极高风险。
+                高风险标的。多风险因素并存，盈利前景差，发行结构不合理。
               </Text>
               <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：坚决不参与
@@ -421,7 +356,7 @@ export const ScoreDetailModal: React.FC<{
             </div>
             <Divider style={{ margin: '8px 0' }} />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              预期收益仅供参考,投资需谨慎
+              预期收益仅供参考，投资需谨慎
             </Text>
           </Space>
         </Card>

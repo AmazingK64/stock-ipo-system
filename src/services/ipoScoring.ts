@@ -580,30 +580,31 @@ class IPOScoringService {
     items.push({ label: '盈利能力', value: profitScore, maxScore: 2, description: profitDesc });
     total += profitScore;
 
-    return { items, total };
+    // 如果后端有返回分数，使用后端分数作为总分
+    const finalTotal = ipoData.score ?? total;
+
+    return { items, total: finalTotal };
   }
 
   /**
-   * 根据评分获取等级 (满分100分)
-   * 阈值: S(≥80), A+(75-79), A(70-74), A-(65-69), B+(58-64), B(48-57), B-(38-47), C+(28-37), C(18-27), D(10-17), F(<10)
+   * 根据评分获取等级（与后端LLM评分标准一致）
+   * A+(≥90), A(85-89), A-(80-84), B+(75-79), B(65-74), B-(55-64), C+(45-54), C(35-44), D(<35)
    */
   getGrade(score: number): string {
     if (this.useHKStrategy) {
       return HKIPOScoringService.getGrade(score);
     }
     
-    // 新等级标准
-    if (score >= 80) return 'S';
-    if (score >= 75) return 'A+';
-    if (score >= 70) return 'A';
-    if (score >= 65) return 'A-';
-    if (score >= 58) return 'B+';
-    if (score >= 48) return 'B';
-    if (score >= 38) return 'B-';
-    if (score >= 28) return 'C+';
-    if (score >= 18) return 'C';
-    if (score >= 10) return 'D';
-    return 'F';
+    // 统一等级标准（与后端LLM一致）
+    if (score >= 90) return 'A+';
+    if (score >= 85) return 'A';
+    if (score >= 80) return 'A-';
+    if (score >= 75) return 'B+';
+    if (score >= 65) return 'B';
+    if (score >= 55) return 'B-';
+    if (score >= 45) return 'C+';
+    if (score >= 35) return 'C';
+    return 'D';
   }
 
   /**

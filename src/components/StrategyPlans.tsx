@@ -1,157 +1,70 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Button, Modal, message, Empty, Table } from 'antd';
+import React, { useMemo } from 'react';
+import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Empty, Progress } from 'antd';
 import {
   TrophyOutlined,
-  ThunderboltOutlined,
   WarningOutlined,
-  CheckCircleOutlined,
-  HistoryOutlined,
-  CheckOutlined
+  FireOutlined,
+  RiseOutlined
 } from '@ant-design/icons';
-import strategyService, { type StrategyPlan } from '../services/strategyService';
-import type { IPOStock, SimilarCompany } from '../types';
+import type { IPOStock } from '../types';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 interface StrategyPlansProps {
   capital: number;
   ipoStocks: IPOStock[];
-  onPlanSelect?: (plan: StrategyPlan) => void;
 }
 
-const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPlanSelect }) => {
-  const [plans, setPlans] = useState<StrategyPlan[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(0);
-  const [historyModalVisible, setHistoryModalVisible] = useState(false);
-  const [selectedStock, setSelectedStock] = useState<IPOStock | null>(null);
+const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => {
+  const recommendedStocks = useMemo(() => {
+    const now = new Date();
+    return ipoStocks
+      .filter(ipo => {
+        if (!ipo.subscriptionEndDate) return true;
+        return new Date(ipo.subscriptionEndDate) >= now;
+      })
+      .filter(ipo => ipo.score && ipo.score >= 65)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 5);
+  }, [ipoStocks]);
 
-  useEffect(() => {
-    if (capital > 0 && ipoStocks.length > 0) {
-      setLoading(true);
-      setTimeout(() => {
-        const topPlans = strategyService.generateTopStrategies(ipoStocks, capital);
-        setPlans(topPlans);
-        setLoading(false);
-        if (topPlans.length > 0 && selectedPlanIndex >= topPlans.length) {
-          setSelectedPlanIndex(0);
-        }
-      }, 500);
-    } else {
-      setPlans([]);
-    }
-  }, [capital, ipoStocks]);
+  const stats = useMemo(() => {
+    const now = new Date();
+    const activeStocks = ipoStocks.filter(ipo => {
+      if (!ipo.subscriptionEndDate) return true;
+      return new Date(ipo.subscriptionEndDate) >= now;
+    });
+    
+    const aGrade = activeStocks.filter(ipo => ipo.grade && ['A+', 'A', 'A-'].includes(ipo.grade)).length;
+    const bGrade = activeStocks.filter(ipo => ipo.grade && ['B+', 'B'].includes(ipo.grade)).length;
+    const avgScore = activeStocks.length > 0
+      ? activeStocks.reduce((sum, ipo) => sum + (ipo.score || 0), 0) / activeStocks.length
+      : 0;
+    
+    return { total: activeStocks.length, aGrade, bGrade, avgScore };
+  }, [ipoStocks]);
 
-  const getRankIcon = (rank: string) => {
-    if (rank === '最优方案') return <TrophyOutlined style={{ color: '#faad14', fontSize: 24 }} />;
-    if (rank === '次优方案') return <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 24 }} />;
-    return <ThunderboltOutlined style={{ color: '#1890ff', fontSize: 24 }} />;
+  const getGradeColor = (grade: string) => {
+    const colors: Record<string, string> = {
+      'A+': '#ff4d4f', 'A': '#ff7a45', 'A-': '#fa8c16',
+      'B+': '#faad14', 'B': '#52c41a', 'B-': '#73d13d',
+      'C+': '#1890ff', 'C': '#69c0ff', 'D': '#8c8c8c'
+    };
+    return colors[grade] || '#8c8c8c';
   };
 
-  const getRankColor = (rank: string) => {
-    if (rank === '最优方案') return '#faad14';
-    if (rank === '次优方案') return '#52c41a';
-    return '#1890ff';
-  };
-
-  const getRiskColor = (riskLevel: string) => {
-    if (riskLevel === '低') return '#52c41a';
-    if (riskLevel === '中低') return '#73d13d';
-    if (riskLevel === '中') return '#faad14';
-    return '#ff4d4f';
-  };
-
-  const handlePlanSelect = (index: number) => {
-    setSelectedPlanIndex(index);
-    if (onPlanSelect && plans[index]) {
-      onPlanSelect(plans[index]);
-    }
-  };
-
-  const handleConfirmPlan = () => {
-    const plan = plans[selectedPlanIndex];
-    if (plan) {
-      message.success(`已选择${plan.rank}`);
-      if (onPlanSelect) {
-        onPlanSelect(plan);
-      }
-    }
-  };
-
-  const renderHistoryData = (stock: IPOStock) => {
-    if (!stock.similarCompanies || stock.similarCompanies.length === 0) {
-      return <Text type="secondary">暂无历史数据</Text>;
-    }
-
-    return (
-      <Table
-        dataSource={stock.similarCompanies}
-        rowKey="stockCode"
-        size="small"
-        pagination={false}
-        columns={[
-          {
-            title: '公司',
-            dataIndex: 'stockName',
-            render: (name: string, record: SimilarCompany) => (
-              <Space direction="vertical" size={0}>
-                <Text strong>{name}</Text>
-                <Text type="secondary" style={{ fontSize: 11 }}>{record.stockCode}</Text>
-              </Space>
-            )
-          },
-          {
-            title: '首日涨幅',
-            dataIndex: 'firstDayReturn',
-            render: (value: number) => (
-              <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
-                {value >= 0 ? '+' : ''}{(value * 100).toFixed(1)}%
-              </Text>
-            )
-          },
-          {
-            title: '首周涨幅',
-            dataIndex: 'firstWeekReturn',
-            render: (value: number) => (
-              <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                {value >= 0 ? '+' : ''}{(value * 100).toFixed(1)}%
-              </Text>
-            )
-          },
-          {
-            title: '首月涨幅',
-            dataIndex: 'firstMonthReturn',
-            render: (value: number) => (
-              <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                {value >= 0 ? '+' : ''}{(value * 100).toFixed(1)}%
-              </Text>
-            )
-          }
-        ]}
-      />
-    );
+  const getScoreProgress = (score: number) => {
+    if (score >= 85) return { percent: 100, color: '#ff4d4f' };
+    if (score >= 75) return { percent: 85, color: '#fa8c16' };
+    if (score >= 65) return { percent: 70, color: '#faad14' };
+    if (score >= 55) return { percent: 55, color: '#52c41a' };
+    return { percent: 40, color: '#1890ff' };
   };
 
   if (capital === 0) {
     return (
-      <Card title={<Space><TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} /><Text strong style={{ fontSize: 18 }}>智能策略方案</Text></Space>}>
-        <Empty description="请先设置资金总量" />
-      </Card>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Card title={<Space><TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} /><Text strong style={{ fontSize: 18 }}>智能策略方案</Text></Space>} loading={loading}>
-        <Empty description="正在计算最优策略..." />
-      </Card>
-    );
-  }
-
-  if (plans.length === 0) {
-    return (
-      <Card title={<Space><TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} /><Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A-级及以上且仍在申购期)</Text></Space>}>
-        <Empty description="暂无符合条件的A-级及以上新股，或已过申购截止日期" />
+      <Card style={{ marginBottom: 24 }}>
+        <Empty description="请先设置资金总量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       </Card>
     );
   }
@@ -161,185 +74,117 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks, onPla
       title={
         <Space>
           <TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} />
-          <Text strong style={{ fontSize: 18 }}>智能策略方案 (仅推荐A-级及以上且仍在申购期)</Text>
+          <Title level={4} style={{ margin: 0 }}>智能策略推荐</Title>
+          <Tag color="blue">A-/B级新股</Tag>
         </Space>
       }
-      style={{ marginBottom: 32 }}
+      style={{ marginBottom: 24 }}
     >
-      {plans.length === 0 ? (
-        <Empty description="暂无符合条件的A级及以上新股，或已过申购截止日期" />
+      <Row gutter={16} style={{ marginBottom: 24 }}>
+        <Col span={6}>
+          <Card size="small" style={{ background: '#f6ffed' }}>
+            <Statistic
+              title="申购中"
+              value={stats.total}
+              suffix="只"
+              prefix={<RiseOutlined style={{ color: '#52c41a' }} />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small" style={{ background: '#fff2e8' }}>
+            <Statistic
+              title="A级(推荐)"
+              value={stats.aGrade}
+              suffix="只"
+              valueStyle={{ color: '#fa8c16' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small" style={{ background: '#e6f7ff' }}>
+            <Statistic
+              title="B级(可参与)"
+              value={stats.bGrade}
+              suffix="只"
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small">
+            <Statistic
+              title="平均评分"
+              value={stats.avgScore.toFixed(0)}
+              suffix="分"
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {recommendedStocks.length === 0 ? (
+        <Empty description="暂无符合条件的推荐新股" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
         <>
-          {/* 横向紧凑的三个方案 */}
+          <Divider style={{ margin: '16px 0' }}>推荐申购</Divider>
           <Row gutter={[16, 16]}>
-            {plans.map((plan, planIndex) => (
-              <Col xs={24} md={8} key={planIndex}>
+            {recommendedStocks.map((ipo, index) => (
+              <Col xs={24} sm={12} md={8} lg={recommendedStocks.length <= 3 ? 8 : 6} key={ipo.stockCode}>
                 <Card
+                  size="small"
                   hoverable
-                  onClick={() => handlePlanSelect(planIndex)}
                   style={{
-                    height: '100%',
-                    border: selectedPlanIndex === planIndex ? `3px solid ${getRankColor(plan.rank)}` : `1px solid #d9d9d9`,
-                    borderRadius: 12,
-                    background: selectedPlanIndex === planIndex ? '#fffbe6' : '#fff',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
+                    borderLeft: `4px solid ${getGradeColor(ipo.grade || 'C')}`,
+                    background: index === 0 ? '#fffbe6' : '#fff'
                   }}
-                  bodyStyle={{ padding: 16 }}
                 >
-                  {/* 方案标题 */}
-                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <Space direction="vertical" size={4}>
-                      {getRankIcon(plan.rank)}
-                      <Text strong style={{ fontSize: 16, color: getRankColor(plan.rank) }}>
-                        {plan.rank}
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {plan.combinations.map(ipo => ipo.stockName).join(' + ')}
-                      </Text>
+                  <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Space>
+                        {index === 0 && <FireOutlined style={{ color: '#ff4d4f' }} />}
+                        <Text strong>{ipo.stockName}</Text>
+                      </Space>
+                      <Tag color={getGradeColor(ipo.grade || 'C')} style={{ fontWeight: 'bold' }}>
+                        {ipo.grade} ({ipo.score})
+                      </Tag>
                     </Space>
-                  </div>
-
-                  <Divider style={{ margin: '12px 0' }} />
-
-                  {/* 核心指标 */}
-                  <Space direction="vertical" style={{ width: '100%' }} size={8}>
-                    <Row gutter={8}>
-                      <Col span={12}>
-                        <Statistic
-                          title={<Text type="secondary" style={{ fontSize: 11 }}>自有资金</Text>}
-                          value={plan.totalCapital}
-                          precision={0}
-                          prefix="HK$"
-                          valueStyle={{ fontSize: 14, color: '#1890ff' }}
-                        />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic
-                          title={<Text type="secondary" style={{ fontSize: 11 }}>收益率</Text>}
-                          value={plan.returnRate * 100}
-                          precision={1}
-                          suffix="%"
-                          valueStyle={{ fontSize: 14, color: '#52c41a', fontWeight: 'bold' }}
-                        />
-                      </Col>
-                    </Row>
-
-                    <Row gutter={8}>
-                      <Col span={12}>
-                        <Statistic
-                          title={<Text type="secondary" style={{ fontSize: 11 }}>净收益</Text>}
-                          value={plan.netReturn}
-                          precision={0}
-                          prefix="HK$"
-                          valueStyle={{ fontSize: 14, color: '#52c41a' }}
-                        />
-                      </Col>
-                      <Col span={12}>
-                        <div>
-                          <Text type="secondary" style={{ fontSize: 11 }}>风险等级</Text>
-                          <div>
-                            <Tag color={getRiskColor(plan.riskLevel)} style={{ marginTop: 4 }}>
-                              {plan.riskLevel}
-                            </Tag>
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-
-                    {/* 快速查看中签率 */}
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 11 }}>中签率</Text>
-                      <div style={{ marginTop: 4 }}>
-                        {plan.winProbability.details.slice(0, 2).map((detail, idx) => (
-                          <Tag key={idx} style={{ marginBottom: 4, fontSize: 11 }}>
-                            {detail.stockName}: {(detail.estimatedWinRate * 100).toFixed(1)}%
-                          </Tag>
-                        ))}
-                        {plan.winProbability.details.length > 2 && (
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            +{plan.winProbability.details.length - 2}只
-                          </Text>
-                        )}
-                      </div>
-                    </div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{ipo.stockCode} · {ipo.industry}</Text>
+                    <Progress
+                      percent={getScoreProgress(ipo.score || 0).percent}
+                      size="small"
+                      showInfo={false}
+                      strokeColor={getScoreProgress(ipo.score || 0).color}
+                    />
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        截止: {ipo.subscriptionEndDate || '-'}
+                      </Text>
+                      {ipo.strategy?.recommendation && (
+                        <Tag color={ipo.strategy.recommendation.includes('推荐') ? 'green' : 'blue'} style={{ fontSize: 11 }}>
+                          {ipo.strategy.recommendation}
+                        </Tag>
+                      )}
+                    </Space>
                   </Space>
-
-                  {/* 选中标识 */}
-                  {selectedPlanIndex === planIndex && (
-                    <div style={{ marginTop: 12, textAlign: 'center' }}>
-                      <Tag color="gold" icon={<CheckOutlined />}>已选择</Tag>
-                    </div>
-                  )}
                 </Card>
               </Col>
             ))}
           </Row>
-
-          {/* 确认按钮 */}
-          <div style={{ marginTop: 16, textAlign: 'center' }}>
-            <Button 
-              type="primary" 
-              size="large"
-              icon={<CheckOutlined />} 
-              onClick={handleConfirmPlan}
-              style={{
-                width: 200,
-                height: 48,
-                fontSize: 16,
-                fontWeight: 'bold',
-                background: getRankColor(plans[selectedPlanIndex]?.rank || '最优方案'),
-                border: 'none'
-              }}
-            >
-              确认选择此方案
-            </Button>
-          </div>
-
-          {/* 展开详情按钮 */}
-          <div style={{ marginTop: 16, textAlign: 'center' }}>
-            <Button 
-              type="link"
-              onClick={() => {
-                const plan = plans[selectedPlanIndex];
-                if (plan) {
-                  setSelectedStock(plan.combinations[0]);
-                  setHistoryModalVisible(true);
-                }
-              }}
-            >
-              查看选中方案详细数据 →
-            </Button>
-          </div>
         </>
       )}
 
-      {/* 历史数据模态框 */}
-      <Modal
-        title={<Space><HistoryOutlined />{selectedStock?.stockName} - 同行业历史表现</Space>}
-        open={historyModalVisible}
-        onCancel={() => setHistoryModalVisible(false)}
-        footer={null}
-        width={800}
-      >
-        {selectedStock && renderHistoryData(selectedStock)}
-      </Modal>
-
-      {/* 投资建议 */}
-      {plans.length > 0 && (
-        <Card style={{ marginTop: 24, background: '#fff7e6', border: '1px solid #ffd591' }}>
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Text strong style={{ color: '#fa8c16' }}>
-              <WarningOutlined style={{ marginRight: 8 }} />
-              重要提示:
-            </Text>
-            <Text>• 以上策略基于历史数据和模型计算,不构成投资建议</Text>
-            <Text>• 中签率受市场情绪、申购人数等因素影响,实际可能偏离预期</Text>
-            <Text>• 融资申购需承担利息成本和更大的风险,请谨慎决策</Text>
-            <Text type="danger">⚠️ 新股投资存在破发风险,请理性投资</Text>
-          </Space>
-        </Card>
-      )}
+      <Card style={{ marginTop: 16, background: '#fff7e6', border: '1px solid #ffd591' }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text strong style={{ color: '#fa8c16' }}>
+            <WarningOutlined style={{ marginRight: 8 }} />
+            投资提示:
+          </Text>
+          <Text>• 推荐基于AI评分，综合考虑行业赛道、基本面、估值等多维度因素</Text>
+          <Text>• 热门赛道（AI、半导体、机器人、创新药）的亏损公司不因亏损扣分</Text>
+          <Text>• 传统医疗/中医类公司评分较低，多为"捞钱"型IPO</Text>
+          <Text type="danger">⚠️ 新股投资存在破发风险，请理性投资</Text>
+        </Space>
+      </Card>
     </Card>
   );
 };
