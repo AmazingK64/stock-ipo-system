@@ -185,6 +185,7 @@ class IPOService {
       moatReason: item.moatReason,
       valuationReason: item.valuationReason,
       lastRoundValuation: item.lastRoundValuation,
+      is18C: item.is18C,
       score: item.score,
       grade: item.grade,
       strategy: item.strategy,

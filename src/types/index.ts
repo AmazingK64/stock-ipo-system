@@ -59,6 +59,7 @@ export interface IPOStock {
   moatReason?: string; // 护城河评分理由
   valuationReason?: string; // 估值评分理由
   lastRoundValuation?: string; // 最后一轮融资估值
+  is18C?: boolean; // 是否为18C章公司(特专科技公司)
 }
 
 /** 实时行情数据 */
@@ -187,4 +188,5 @@ export interface IRawIPOData {
   grade?: string; // 后端LLM评级
   strategy?: IPOStrategy; // 后端LLM策略
   llmScoringReason?: string; // 后端LLM评分依据摘要
+  is18C?: boolean; // 是否为18C章公司(特专科技公司)
 }

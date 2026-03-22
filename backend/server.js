@@ -539,6 +539,42 @@ app.get('/api/today-listed', async (req, res) => {
   }
 });
 
+/**
+ * 深度分析API - 生成专业的IPO分析文章
+ * POST /api/deep-analysis
+ * Body: { stockCode: string, stockName: string, ...ipoData }
+ */
+app.post('/api/deep-analysis', async (req, res) => {
+  const timeout = 120000;
+  try {
+    const ipoData = req.body;
+    console.log(`[API] 开始深度分析: ${ipoData.stockCode} ${ipoData.stockName}`);
+
+    if (!ipoData.stockCode || !ipoData.stockName) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少股票代码或名称'
+      });
+    }
+
+    const analysis = await webSearchService.generateDeepAnalysis(ipoData);
+
+    res.json({
+      success: true,
+      stockCode: ipoData.stockCode,
+      stockName: ipoData.stockName,
+      data: analysis,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[API] 深度分析失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // 获取所有IPO数据(分类)
 app.get('/api/ipo-all', async (req, res) => {
   const timeout = 20000;

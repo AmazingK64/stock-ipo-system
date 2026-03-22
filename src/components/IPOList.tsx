@@ -9,7 +9,7 @@ import { TrophyOutlined } from '@ant-design/icons';
 import type { IPOStock, RealtimeQuote } from '../types';
 import { createIPOTabItems } from './IPOTabs';
 import { ScoreDetailModal, type ExtendedIPOStock } from './IPOColumns';
-import AIWorkflow from './AIWorkflow';
+import DeepAnalysis from './DeepAnalysis';
 
 const { Text } = Typography;
 
@@ -145,10 +145,10 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = 
         onClose={() => setScoreDetailVisible(false)}
       />
 
-      {/* AI工作流弹窗 */}
-      <AIWorkflow
+      {/* 深度分析弹窗 */}
+      <DeepAnalysis
         visible={aiWorkflowVisible}
-        ipoData={selectedIPO!}
+        ipoData={selectedIPO}
         onClose={() => setAIWorkflowVisible(false)}
       />
     </>

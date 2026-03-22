@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Table, Tag, Space, Typography, Alert, Statistic, Row, Col, Empty, Spin, Button, message } from 'antd';
 import { 
   FireOutlined, 
@@ -6,10 +6,14 @@ import {
   InfoCircleOutlined,
   RiseOutlined,
   WarningOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
 
 const { Text, Title } = Typography;
+
+const MARGIN_DATA_CACHE_KEY = 'ipo_margin_data_cache';
+const MARGIN_DATA_EXPIRY_KEY = 'ipo_margin_data_expiry';
 
 interface MarginData {
   stockCode: string;
@@ -25,12 +29,55 @@ interface MarginData {
   sharesPerLot?: number;
 }
 
+interface CachedData {
+  data: MarginData[];
+  lastUpdate: string;
+  cachedAt: number;
+}
+
 const RealTimeMarginData: React.FC = () => {
   const [data, setData] = useState<MarginData[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [isFromCache, setIsFromCache] = useState(false);
+
+  useEffect(() => {
+    loadCachedData();
+  }, []);
+
+  const loadCachedData = () => {
+    try {
+      const cached = localStorage.getItem(MARGIN_DATA_CACHE_KEY);
+      if (cached) {
+        const parsed: CachedData = JSON.parse(cached);
+        if (parsed.data && parsed.data.length > 0) {
+          setData(parsed.data);
+          setLastUpdate(parsed.lastUpdate);
+          setHasLoaded(true);
+          setIsFromCache(true);
+          console.log('[MarginData] 从缓存加载孖展数据:', parsed.data.length, '条');
+        }
+      }
+    } catch (err) {
+      console.warn('[MarginData] 读取缓存失败:', err);
+    }
+  };
+
+  const saveCachedData = (newData: MarginData[], updateTime: string) => {
+    try {
+      const cacheData: CachedData = {
+        data: newData,
+        lastUpdate: updateTime,
+        cachedAt: Date.now()
+      };
+      localStorage.setItem(MARGIN_DATA_CACHE_KEY, JSON.stringify(cacheData));
+      console.log('[MarginData] 孖展数据已缓存');
+    } catch (err) {
+      console.warn('[MarginData] 缓存保存失败:', err);
+    }
+  };
 
   const parseMarketCap = (marketCap: string | undefined): number | null => {
     if (!marketCap) return null;
@@ -53,17 +100,15 @@ const RealTimeMarginData: React.FC = () => {
   const calculateMarginAmount = (ipo: MarginData): number | null => {
     if (!ipo.marginMultiple || ipo.marginMultiple <= 0) return null;
 
-    // 方法1: 使用 marketCap（IPO发售金额/集资规模）
     const marketCapValue = parseMarketCap(ipo.marketCap);
     if (marketCapValue && marketCapValue > 0) {
       return ipo.marginMultiple * marketCapValue;
     }
 
-    // 方法2: 使用 offeringShares × issuePrice
     if (ipo.offeringShares && ipo.offeringShares > 0) {
       const price = parseIssuePrice(ipo.issuePrice);
       if (price && price > 0) {
-        const publicOfferAmount = (ipo.offeringShares * price) / 100000000; // 转换为亿
+        const publicOfferAmount = (ipo.offeringShares * price) / 100000000;
         return ipo.marginMultiple * publicOfferAmount;
       }
     }
@@ -88,6 +133,7 @@ const RealTimeMarginData: React.FC = () => {
       
       if (result.success && result.data) {
         const now = new Date();
+        const updateTime = new Date().toLocaleString('zh-CN');
         const activeData = result.data
           .filter((ipo: any) => {
             if (!ipo.subscriptionEndDate) return true;
@@ -108,7 +154,6 @@ const RealTimeMarginData: React.FC = () => {
               sharesPerLot: ipo.sharesPerLot
             };
 
-            // 如果没有孖展金额，根据孖展倍数和招股书数据计算
             if (!marginData.marginAmount && marginData.marginMultiple) {
               const calculated = calculateMarginAmount(marginData);
               if (calculated) {
@@ -120,8 +165,12 @@ const RealTimeMarginData: React.FC = () => {
           });
         
         setData(activeData);
-        setLastUpdate(new Date().toLocaleString('zh-CN'));
+        setLastUpdate(updateTime);
         setHasLoaded(true);
+        setIsFromCache(false);
+
+        saveCachedData(activeData, updateTime);
+        
         message.success(`获取到 ${activeData.length} 条申购数据`);
       } else {
         throw new Error('数据为空');
@@ -246,9 +295,16 @@ const RealTimeMarginData: React.FC = () => {
             <ThunderboltOutlined style={{ color: '#1890ff', fontSize: 20 }} />
             <Title level={4} style={{ margin: 0 }}>实时孖展数据</Title>
             {data.length > 0 && <Tag color="blue">申购中: {data.length}只</Tag>}
+            {isFromCache && (
+              <Tag color="orange" icon={<ClockCircleOutlined />}>缓存数据</Tag>
+            )}
           </Space>
           <Space>
-            {lastUpdate && <Text type="secondary" style={{ fontSize: 12 }}>更新: {lastUpdate}</Text>}
+            {lastUpdate && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {isFromCache ? '缓存时间: ' : '更新: '}{lastUpdate}
+              </Text>
+            )}
             <Button 
               type="primary"
               icon={<ReloadOutlined spin={loading} />}
@@ -349,6 +405,7 @@ const RealTimeMarginData: React.FC = () => {
                 <Text>• 孖展倍数: 融资认购金额 / 公开发售金额，反映市场申购热度</Text>
                 <Text>• 孖展金额 = 孖展倍数 × 集资规模（根据招股书数据计算）</Text>
                 <Text>• 数据来源: AiPO数据网 (aipo.myiqdii.com)</Text>
+                <Text>• 数据自动缓存，点击「刷新数据」获取最新数据</Text>
                 <Text type="warning">⚠️ 数据仅供参考，投资需谨慎</Text>
               </Space>
             }

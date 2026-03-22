@@ -174,7 +174,6 @@ class WebSearchService {
           result = await this.searchWithBrave(finalQuery);
         }
 
-        // 降级：使用免费搜索
         if (!result) {
           result = await this.searchWithDuckDuckGo(finalQuery);
         }
@@ -190,8 +189,7 @@ class WebSearchService {
         console.warn(`[WebSearch] 搜索 "${query.type}" 失败:`, error.message);
       }
 
-      // 搜索间隔，避免被限制
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     return allResults;
@@ -210,7 +208,7 @@ class WebSearchService {
         max_results: 6,
         topic: 'news'
       }, {
-        timeout: 15000
+        timeout: 8000
       });
 
       const results = response.data?.results || [];
@@ -955,6 +953,225 @@ ${JSON.stringify({
 
     console.log(`[WebSearch] 批量补充完成，共搜索了 ${searchCount}/${ipoList.length} 只`);
     return enrichedList;
+  }
+
+  /**
+   * 生成深度分析文章
+   * @param {Object} ipoData - IPO数据
+   * @returns {Promise<Object>} 分析文章
+   */
+  async generateDeepAnalysis(ipoData) {
+    const { stockCode, stockName, industry, marketCap, issuePrice, marginMultiple } = ipoData;
+
+    console.log(`[DeepAnalysis] 开始生成 ${stockName} 的深度分析文章...`);
+
+    let searchContext = '';
+    
+    try {
+      const searchQueries = [
+        `${stockName} 港股 IPO 分析`,
+        `${stockName} 公司业务 商业模式`,
+        `${stockName} 行业地位 竞争对手`
+      ];
+
+      const searchPromise = this.executeSearches(searchQueries);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('搜索超时')), 20000)
+      );
+
+      const searchResults = await Promise.race([searchPromise, timeoutPromise]).catch(err => {
+        console.warn('[DeepAnalysis] 搜索超时，跳过搜索:', err.message);
+        return null;
+      });
+
+      if (searchResults && searchResults.length > 0) {
+        searchContext = searchResults.map(group => {
+          const items = (group.results || []).map(r => `- ${r.title}: ${r.snippet}`).join('\n');
+          return `【${group.type}】\n${items}`;
+        }).join('\n\n');
+        console.log('[DeepAnalysis] 搜索成功，获取到上下文信息');
+      }
+    } catch (err) {
+      console.warn('[DeepAnalysis] 搜索失败，将使用基础信息生成分析:', err.message);
+    }
+
+    if (!this.aiApiUrl || !this.aiApiKey) {
+      console.log('[DeepAnalysis] AI API未配置，使用降级分析');
+      return this.generateFallbackAnalysis(ipoData);
+    }
+
+    try {
+      console.log('[DeepAnalysis] 调用AI生成分析文章...');
+      const prompt = this.buildAnalysisPrompt(ipoData, searchContext);
+
+      const response = await axios.post(this.aiApiUrl, {
+        model: this.aiModel,
+        messages: [
+          {
+            role: 'system',
+            content: `你是一位资深的港股IPO分析师，擅长撰写专业、深入、通俗易懂的IPO分析文章。
+你的文章风格应该：
+1. 专业但不晦涩，用大白话解释复杂概念
+2. 结构清晰，有明确的标题和分段
+3. 数据翔实，引用具体数字和比例
+4. 观点鲜明，给出明确的投资建议
+5. 风险提示到位，不盲目唱多
+
+请用Markdown格式输出文章，包含以下部分：
+- 公司是做什么的（用大白话解释业务）
+- 行业分析（市场规模、竞争格局、发展趋势）
+- 财务分析（营收、利润、增长趋势）
+- 估值分析（与同行对比、是否合理）
+- 申购建议（是否推荐、申购策略）
+- 风险提示
+
+文章长度控制在1500-2500字。`
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      }, {
+        headers: {
+          'Authorization': `Bearer ${this.aiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 90000
+      });
+
+      const content = response.data?.choices?.[0]?.message?.content || '';
+      console.log('[DeepAnalysis] AI生成成功，内容长度:', content.length);
+
+      return {
+        title: `${stockName}(${stockCode}) IPO深度分析`,
+        content: content,
+        stockCode,
+        stockName,
+        generatedAt: new Date().toISOString(),
+        dataSource: 'ai_analysis'
+      };
+    } catch (error) {
+      console.error('[DeepAnalysis] AI生成失败:', error.message);
+      return this.generateFallbackAnalysis(ipoData);
+    }
+  }
+
+  /**
+   * 构建分析提示词
+   */
+  buildAnalysisPrompt(ipoData, searchContext) {
+    const {
+      stockCode,
+      stockName,
+      industry,
+      marketCap,
+      issuePrice,
+      marginMultiple,
+      profitability,
+      revenue,
+      netProfit,
+      revenueGrowth,
+      grossMargin,
+      netMargin,
+      roe,
+      subscriptionEndDate,
+      listingDate,
+      totalLots,
+      sharesPerLot,
+      publicSharesRatio,
+      cornerstoneInvestors,
+      cornerstoneRatio,
+      prospectusUrl
+    } = ipoData;
+
+    return `请为以下港股IPO撰写一篇专业的深度分析文章：
+
+## 基本信息
+- 股票代码: ${stockCode}
+- 股票名称: ${stockName}
+- 所属行业: ${industry || '未知'}
+- 发行价: ${issuePrice ? `${issuePrice}港元` : '待定'}
+- 市值: ${marketCap ? `${marketCap}亿港元` : '待定'}
+- 孖展倍数: ${marginMultiple ? `${marginMultiple}倍` : '暂无'}
+- 申购截止: ${subscriptionEndDate || '待定'}
+- 上市日期: ${listingDate || '待定'}
+- 每手股数: ${sharesPerLot || '未知'}
+- 公开发售比例: ${publicSharesRatio ? `${publicSharesRatio}%` : '未知'}
+
+## 财务数据
+- 盈利状况: ${profitability === 'profitable' ? '盈利' : profitability === 'loss' ? '亏损' : '未知'}
+- 营收: ${revenue ? `${revenue}亿` : '未知'}
+- 净利润: ${netProfit ? `${netProfit}亿` : '未知'}
+- 营收增长: ${revenueGrowth ? `${revenueGrowth}%` : '未知'}
+- 毛利率: ${grossMargin ? `${grossMargin}%` : '未知'}
+- 净利率: ${netMargin ? `${netMargin}%` : '未知'}
+- ROE: ${roe ? `${roe}%` : '未知'}
+
+## 基石投资者
+${cornerstoneInvestors ? `- 基石投资者: ${cornerstoneInvestors}` : '- 基石投资者: 未披露'}
+${cornerstoneRatio ? `- 基石占比: ${cornerstoneRatio}%` : ''}
+
+## 网络搜索信息
+${searchContext || '暂无额外搜索信息'}
+
+请根据以上信息，撰写一篇专业的IPO分析文章。文章应该：
+1. 用大白话解释公司是做什么的，让普通投资者也能看懂
+2. 分析行业前景和竞争格局
+3. 评估财务健康状况和增长潜力
+4. 给出估值判断和申购建议
+5. 提示主要风险
+
+请直接输出Markdown格式的文章内容，不需要代码块包裹。`;
+  }
+
+  /**
+   * 生成降级分析文章（AI不可用时）
+   */
+  generateFallbackAnalysis(ipoData) {
+    const { stockCode, stockName, industry, marketCap, issuePrice, marginMultiple, profitability, revenue } = ipoData;
+
+    const content = `# ${stockName}(${stockCode}) IPO分析
+
+## 公司简介
+
+${stockName}是一家${industry || '未知行业'}公司，目前正在港股进行IPO申购。
+
+## 基本信息
+
+| 项目 | 数据 |
+|------|------|
+| 股票代码 | ${stockCode} |
+| 发行价 | ${issuePrice ? `${issuePrice}港元` : '待定'} |
+| 市值 | ${marketCap ? `${marketCap}亿港元` : '待定'} |
+| 孖展倍数 | ${marginMultiple ? `${marginMultiple}倍` : '暂无'} |
+| 盈利状况 | ${profitability === 'profitable' ? '盈利' : profitability === 'loss' ? '亏损' : '未知'} |
+| 营收规模 | ${revenue ? `${revenue}亿` : '未知'} |
+
+## 申购建议
+
+${marginMultiple && marginMultiple > 50 ? 
+  `当前孖展倍数${marginMultiple}倍，市场热度较高，预计中签率较低。建议根据个人资金情况适度参与。` :
+  marginMultiple && marginMultiple > 20 ?
+  `当前孖展倍数${marginMultiple}倍，市场关注度中等，可考虑参与申购。` :
+  `暂无充分孖展数据，建议关注后续市场反应。`}
+
+## 风险提示
+
+1. 股市有风险，投资需谨慎
+2. 以上分析基于公开数据，仅供参考
+3. 请根据个人风险承受能力做出投资决策
+
+---
+*本分析由系统自动生成，AI服务暂时不可用*`;
+
+    return {
+      title: `${stockName}(${stockCode}) IPO分析`,
+      content: content,
+      stockCode,
+      stockName,
+      generatedAt: new Date().toISOString(),
+      dataSource: 'fallback'
+    };
   }
 }
 

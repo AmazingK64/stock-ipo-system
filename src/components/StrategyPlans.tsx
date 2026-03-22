@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Empty, Progress } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Space, Typography, Divider, Empty, Progress, Tooltip } from 'antd';
 import {
   TrophyOutlined,
   WarningOutlined,
   FireOutlined,
-  RiseOutlined
+  RiseOutlined,
+  QuestionCircleOutlined
 } from '@ant-design/icons';
 import type { IPOStock } from '../types';
 
@@ -16,16 +17,118 @@ interface StrategyPlansProps {
 }
 
 const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => {
+  const parseMarketCap = (marketCap: string | undefined): number | null => {
+    if (!marketCap) return null;
+    const match = marketCap.match(/([\d.]+)/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+    return null;
+  };
+
+  const estimateWinRate = (
+    marginMultiple: number | undefined, 
+    publicSharesRatio: number | undefined,
+    is18C: boolean = false
+  ): {
+    rate: number;
+    level: string;
+    color: string;
+    description: string;
+  } => {
+    if (!marginMultiple || marginMultiple <= 0) {
+      return {
+        rate: 0,
+        level: '未知',
+        color: '#8c8c8c',
+        description: '暂无孖展数据'
+      };
+    }
+
+    const publicRatio = (publicSharesRatio || 10) / 100;
+
+    let effectivePublicRatio = publicRatio;
+    
+    if (is18C) {
+      if (marginMultiple >= 100) {
+        effectivePublicRatio = Math.min(0.5, publicRatio * 5);
+      } else if (marginMultiple >= 50) {
+        effectivePublicRatio = Math.min(0.4, publicRatio * 3);
+      } else if (marginMultiple >= 20) {
+        effectivePublicRatio = Math.min(0.3, publicRatio * 2);
+      }
+    } else {
+      if (marginMultiple >= 100) {
+        effectivePublicRatio = Math.min(0.5, publicRatio * 3);
+      } else if (marginMultiple >= 50) {
+        effectivePublicRatio = Math.min(0.4, publicRatio * 2);
+      } else if (marginMultiple >= 20) {
+        effectivePublicRatio = Math.min(0.3, publicRatio * 1.5);
+      }
+    }
+
+    const totalSubscription = marginMultiple + 1;
+    let winRate = (effectivePublicRatio / totalSubscription) * 100;
+
+    winRate = Math.min(winRate, 100);
+    winRate = Math.max(winRate, 0.1);
+
+    let level: string;
+    let color: string;
+    let description: string;
+
+    if (marginMultiple >= 100) {
+      level = '极低';
+      color = '#ff4d4f';
+      description = is18C 
+        ? `18C公司孖展${marginMultiple.toFixed(0)}倍，回拨后公开发售比例增加，预计中签率约${winRate.toFixed(2)}%`
+        : `孖展${marginMultiple.toFixed(0)}倍，预计回拨后中签率约${winRate.toFixed(2)}%`;
+    } else if (marginMultiple >= 50) {
+      level = '较低';
+      color = '#fa8c16';
+      description = `孖展${marginMultiple.toFixed(0)}倍，预计中签率约${winRate.toFixed(2)}%`;
+    } else if (marginMultiple >= 20) {
+      level = '中等';
+      color = '#faad14';
+      description = `孖展${marginMultiple.toFixed(0)}倍，预计中签率约${winRate.toFixed(2)}%`;
+    } else if (marginMultiple >= 10) {
+      level = '较高';
+      color = '#52c41a';
+      description = `孖展${marginMultiple.toFixed(0)}倍，预计中签率约${winRate.toFixed(2)}%`;
+    } else if (marginMultiple >= 5) {
+      level = '高';
+      color = '#1890ff';
+      description = `孖展${marginMultiple.toFixed(0)}倍，预计中签率约${winRate.toFixed(2)}%`;
+    } else {
+      level = '很高';
+      color = '#722ed1';
+      description = `孖展${marginMultiple.toFixed(1)}倍，预计中签率约${winRate.toFixed(2)}%`;
+    }
+
+    return { rate: winRate, level, color, description };
+  };
+
   const recommendedStocks = useMemo(() => {
     const now = new Date();
+    console.log('[StrategyPlans] ipoStocks:', ipoStocks.map(s => ({ 
+      code: s.stockCode, 
+      name: s.stockName, 
+      marginMultiple: s.marginMultiple, 
+      publicSharesRatio: s.publicSharesRatio,
+      is18C: s.is18C 
+    })));
     return ipoStocks
       .filter(ipo => {
         if (!ipo.subscriptionEndDate) return true;
         return new Date(ipo.subscriptionEndDate) >= now;
       })
-      .filter(ipo => ipo.score && ipo.score >= 65)
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
-      .slice(0, 5);
+      .filter(ipo => ipo.score && ipo.score >= 55)
+      .sort((a, b) => {
+        const scoreDiff = (b.score || 0) - (a.score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return (a.marginMultiple || 0) - (b.marginMultiple || 0);
+      })
+      .slice(0, 6);
   }, [ipoStocks]);
 
   const stats = useMemo(() => {
@@ -40,8 +143,10 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
     const avgScore = activeStocks.length > 0
       ? activeStocks.reduce((sum, ipo) => sum + (ipo.score || 0), 0) / activeStocks.length
       : 0;
+
+    const avgMarginMultiple = activeStocks.reduce((sum, ipo) => sum + (ipo.marginMultiple || 0), 0) / (activeStocks.length || 1);
     
-    return { total: activeStocks.length, aGrade, bGrade, avgScore };
+    return { total: activeStocks.length, aGrade, bGrade, avgScore, avgMarginMultiple };
   }, [ipoStocks]);
 
   const getGradeColor = (grade: string) => {
@@ -75,7 +180,7 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
         <Space>
           <TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} />
           <Title level={4} style={{ margin: 0 }}>智能策略推荐</Title>
-          <Tag color="blue">A-/B级新股</Tag>
+          <Tag color="blue">基于评分+孖展数据</Tag>
         </Space>
       }
       style={{ marginBottom: 24 }}
@@ -114,9 +219,9 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
         <Col span={6}>
           <Card size="small">
             <Statistic
-              title="平均评分"
-              value={stats.avgScore.toFixed(0)}
-              suffix="分"
+              title="平均孖展"
+              value={stats.avgMarginMultiple.toFixed(1)}
+              suffix="x"
             />
           </Card>
         </Col>
@@ -126,49 +231,82 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
         <Empty description="暂无符合条件的推荐新股" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
         <>
-          <Divider style={{ margin: '16px 0' }}>推荐申购</Divider>
+          <Divider style={{ margin: '16px 0' }}>推荐申购 (按评分排序)</Divider>
           <Row gutter={[16, 16]}>
-            {recommendedStocks.map((ipo, index) => (
-              <Col xs={24} sm={12} md={8} lg={recommendedStocks.length <= 3 ? 8 : 6} key={ipo.stockCode}>
-                <Card
-                  size="small"
-                  hoverable
-                  style={{
-                    borderLeft: `4px solid ${getGradeColor(ipo.grade || 'C')}`,
-                    background: index === 0 ? '#fffbe6' : '#fff'
-                  }}
-                >
-                  <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                      <Space>
-                        {index === 0 && <FireOutlined style={{ color: '#ff4d4f' }} />}
-                        <Text strong>{ipo.stockName}</Text>
-                      </Space>
-                      <Tag color={getGradeColor(ipo.grade || 'C')} style={{ fontWeight: 'bold' }}>
-                        {ipo.grade} ({ipo.score})
-                      </Tag>
-                    </Space>
-                    <Text type="secondary" style={{ fontSize: 12 }}>{ipo.stockCode} · {ipo.industry}</Text>
-                    <Progress
-                      percent={getScoreProgress(ipo.score || 0).percent}
-                      size="small"
-                      showInfo={false}
-                      strokeColor={getScoreProgress(ipo.score || 0).color}
-                    />
-                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                      <Text type="secondary" style={{ fontSize: 11 }}>
-                        截止: {ipo.subscriptionEndDate || '-'}
-                      </Text>
-                      {ipo.strategy?.recommendation && (
-                        <Tag color={ipo.strategy.recommendation.includes('推荐') ? 'green' : 'blue'} style={{ fontSize: 11 }}>
-                          {ipo.strategy.recommendation}
+            {recommendedStocks.map((ipo, index) => {
+              const winRateInfo = estimateWinRate(ipo.marginMultiple, ipo.publicSharesRatio, ipo.is18C);
+              
+              return (
+                <Col xs={24} sm={12} md={8} lg={recommendedStocks.length <= 3 ? 8 : 6} key={ipo.stockCode}>
+                  <Card
+                    size="small"
+                    hoverable
+                    style={{
+                      borderLeft: `4px solid ${getGradeColor(ipo.grade || 'C')}`,
+                      background: index === 0 ? '#fffbe6' : '#fff'
+                    }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Space>
+                          {index === 0 && <FireOutlined style={{ color: '#ff4d4f' }} />}
+                          <Text strong>{ipo.stockName}</Text>
+                        </Space>
+                        <Tag color={getGradeColor(ipo.grade || 'C')} style={{ fontWeight: 'bold' }}>
+                          {ipo.grade} ({ipo.score})
                         </Tag>
-                      )}
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{ipo.stockCode} · {ipo.industry}</Text>
+                      
+                      <Progress
+                        percent={getScoreProgress(ipo.score || 0).percent}
+                        size="small"
+                        showInfo={false}
+                        strokeColor={getScoreProgress(ipo.score || 0).color}
+                      />
+
+                      <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 4 }}>
+                        <Space>
+                          <Text type="secondary" style={{ fontSize: 11 }}>孖展:</Text>
+                          {ipo.marginMultiple ? (
+                            <Tag color={winRateInfo.color} style={{ fontSize: 11 }}>
+                              {ipo.marginMultiple.toFixed(1)}x
+                            </Tag>
+                          ) : (
+                            <Text type="secondary" style={{ fontSize: 11 }}>暂无</Text>
+                          )}
+                        </Space>
+                        <Tooltip title={winRateInfo.description}>
+                          <Tag 
+                            style={{ 
+                              fontSize: 11, 
+                              cursor: 'pointer',
+                              background: winRateInfo.color + '20',
+                              border: `1px solid ${winRateInfo.color}`,
+                              color: winRateInfo.color
+                            }}
+                          >
+                            中签率: {winRateInfo.level}
+                            <QuestionCircleOutlined style={{ marginLeft: 4, fontSize: 10 }} />
+                          </Tag>
+                        </Tooltip>
+                      </Space>
+
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          截止: {ipo.subscriptionEndDate || '-'}
+                        </Text>
+                        {ipo.strategy?.recommendation && (
+                          <Tag color={ipo.strategy.recommendation.includes('推荐') ? 'green' : 'blue'} style={{ fontSize: 11 }}>
+                            {ipo.strategy.recommendation}
+                          </Tag>
+                        )}
+                      </Space>
                     </Space>
-                  </Space>
-                </Card>
-              </Col>
-            ))}
+                  </Card>
+                </Col>
+              );
+            })}
           </Row>
         </>
       )}
@@ -177,12 +315,12 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
         <Space direction="vertical" style={{ width: '100%' }}>
           <Text strong style={{ color: '#fa8c16' }}>
             <WarningOutlined style={{ marginRight: 8 }} />
-            投资提示:
+            中签率说明:
           </Text>
-          <Text>• 推荐基于AI评分，综合考虑行业赛道、基本面、估值等多维度因素</Text>
-          <Text>• 热门赛道（AI、半导体、机器人、创新药）的亏损公司不因亏损扣分</Text>
-          <Text>• 传统医疗/中医类公司评分较低，多为"捞钱"型IPO</Text>
-          <Text type="danger">⚠️ 新股投资存在破发风险，请理性投资</Text>
+          <Text>• 中签率基于孖展倍数估算，考虑回拨机制影响</Text>
+          <Text>• 孖展倍数越高，中签率越低，但可能触发回拨提高公开发售比例</Text>
+          <Text>• 孖展≥100x: 极低(预计回拨) | 50-99x: 较低 | 20-49x: 中等 | 10-19x: 较高 | 5-9x: 高 | &lt;5x: 很高</Text>
+          <Text type="danger">⚠️ 估算仅供参考，实际中签率以券商公布为准</Text>
         </Space>
       </Card>
     </Card>
