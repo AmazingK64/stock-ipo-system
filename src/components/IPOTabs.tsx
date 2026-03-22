@@ -6,7 +6,6 @@
 import { Table, Badge } from 'antd';
 import {
   BankOutlined,
-  CalendarOutlined,
   RiseOutlined,
   ClockCircleOutlined
 } from '@ant-design/icons';
@@ -26,14 +25,18 @@ interface IPOTabsProps {
   loading: boolean;
   rowKey?: string;
   onScoreClick?: (record: IPOStock) => void;
+  onAIWorkflowClick?: (record: IPOStock) => void;
 }
 
 /** Tab配置 */
 export const createIPOTabItems = (props: IPOTabsProps) => {
-  const { groupedStocks, loading, rowKey = 'id', onScoreClick } = props;
+  const { groupedStocks, loading, rowKey = 'id', onScoreClick, onAIWorkflowClick } = props;
 
   // 获取带有评分点击回调的列配置
-  const ipoColumns = getIPOColumns(onScoreClick || (() => {}));
+  const ipoColumns = getIPOColumns(
+    onScoreClick || (() => {}),
+    onAIWorkflowClick || (() => {})
+  );
 
   return [
     {
@@ -66,39 +69,6 @@ export const createIPOTabItems = (props: IPOTabsProps) => {
             return '';
           }}
           locale={{ emptyText: '暂无申购中的新股' }}
-        />
-      )
-    },
-    {
-      key: 'upcoming',
-      label: (
-        <span>
-          <CalendarOutlined />
-          即将上市
-          {groupedStocks.upcoming.length > 0 && (
-            <Badge count={groupedStocks.upcoming.length} style={{ marginLeft: 8, backgroundColor: '#faad14' }} />
-          )}
-        </span>
-      ),
-      children: (
-        <Table
-          columns={ipoColumns}
-          dataSource={groupedStocks.upcoming}
-          rowKey={rowKey}
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 只`
-          }}
-          scroll={{ x: 1300 }}
-          rowClassName={(record) => {
-            const grade = (record as ExtendedIPOStock).grade || '';
-            if (grade.startsWith('A')) return 'row-highlight-a';
-            if (grade.startsWith('B')) return 'row-highlight-b';
-            return '';
-          }}
-          locale={{ emptyText: '暂无即将上市的新股' }}
         />
       )
     },

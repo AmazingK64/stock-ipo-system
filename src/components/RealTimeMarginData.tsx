@@ -40,10 +40,7 @@ const RealTimeMarginData: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
-    // 每5分钟自动刷新一次
-    const interval = setInterval(loadData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // 不再自动请求，等待用户手动点击刷新
   }, []);
 
   const getHeatTag = (publicMultiple: number) => {

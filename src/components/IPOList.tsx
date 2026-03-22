@@ -9,6 +9,7 @@ import { TrophyOutlined } from '@ant-design/icons';
 import type { IPOStock, RealtimeQuote } from '../types';
 import { createIPOTabItems } from './IPOTabs';
 import { ScoreDetailModal, type ExtendedIPOStock } from './IPOColumns';
+import AIWorkflow from './AIWorkflow';
 
 const { Text } = Typography;
 
@@ -26,14 +27,21 @@ interface GroupedStocks {
 }
 
 const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = [] }) => {
-  const [activeTab, setActiveTab] = useState<string>('upcoming');
+  const [activeTab, setActiveTab] = useState<string>('subscribe');
   const [scoreDetailVisible, setScoreDetailVisible] = useState(false);
+  const [aiWorkflowVisible, setAIWorkflowVisible] = useState(false);
   const [selectedIPO, setSelectedIPO] = useState<IPOStock | null>(null);
 
   /** 点击评分显示详情 */
   const handleScoreClick = (record: IPOStock) => {
     setSelectedIPO(record);
     setScoreDetailVisible(true);
+  };
+
+  /** 启动AI工作流 */
+  const handleAIWorkflowClick = (record: IPOStock) => {
+    setSelectedIPO(record);
+    setAIWorkflowVisible(true);
   };
 
   /** 根据状态分组股票 */
@@ -97,12 +105,11 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = 
     groupedStocks,
     loading,
     rowKey: 'id',
-    onScoreClick: handleScoreClick
+    onScoreClick: handleScoreClick,
+    onAIWorkflowClick: handleAIWorkflowClick
   });
 
   /** 统计数据 */
-  const totalCount = ipoStocks.length;
-  const upcomingCount = groupedStocks.upcoming.length;
   const subscribeCount = groupedStocks.subscribe.length;
 
   return (
@@ -113,7 +120,7 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = 
             <TrophyOutlined style={{ color: '#1890ff', fontSize: 20 }} />
             <Text strong style={{ fontSize: 18 }}>新股数据</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              (共 {totalCount} 只 | 申购中 {subscribeCount} 只 | 即将上市 {upcomingCount} 只)
+              (申购中 {subscribeCount} 只)
             </Text>
           </Space>
         }
@@ -136,6 +143,13 @@ const IPOList: React.FC<IPOListProps> = ({ ipoStocks, loading, realtimeQuotes = 
         visible={scoreDetailVisible}
         record={selectedIPO}
         onClose={() => setScoreDetailVisible(false)}
+      />
+
+      {/* AI工作流弹窗 */}
+      <AIWorkflow
+        visible={aiWorkflowVisible}
+        ipoData={selectedIPO!}
+        onClose={() => setAIWorkflowVisible(false)}
       />
     </>
   );

@@ -12,9 +12,14 @@ const express = require('express');
 const cors = require('cors');
 const net = require('net');
 const path = require('path');
+const dotenv = require('dotenv');
+
+// 先加载环境变量，再加载其他模块
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.join(__dirname, '.env') });
+
 const etnetScraper = require('./scraper/etnet-scraper-fixed');
 const aastocksScraper = require('./scraper/aastocks-scraper');
-const prospectusScraper = require('./scraper/prospectus-scraper');
 const dataProvider = require('./dataProvider');
 const prospectusDownloader = require('./scraper/hkex-prospectus-downloader');
 const webSearchService = require('./scraper/web-search-service');
@@ -81,20 +86,29 @@ const getCurrentDateInfo = () => {
 
 // 获取所有IPO数据（合并多个数据源）
 app.get('/api/ipo-list', async (req, res) => {
-  const timeout = 15000; // 15秒超时
+  console.log('[API] /api/ipo-list 请求开始');
 
   try {
-    console.log('[API] 获取IPO列表...');
-
     // 优先使用静态数据
     const unlistedIPOs = await dataProvider.getAllUnlistedIPOs();
 
     if (unlistedIPOs && unlistedIPOs.length > 0) {
-      console.log(`[API] 使用静态数据，共 ${unlistedIPOs.length} 条`);
+      console.log(`[API] 静态数据: ${unlistedIPOs.length} 条`);
 
+      let resultData;
+      try {
+        console.log('[API] 开始LLM评分...');
+        resultData = await webSearchService.enrichAndScoreSubscribeIPOs(unlistedIPOs);
+        console.log('[API] LLM评分完成');
+      } catch (err) {
+        console.warn('[API] LLM评分失败，使用原始数据:', err.message);
+        resultData = unlistedIPOs;
+      }
+
+      console.log('[API] 准备返回数据，长度:', resultData.length);
       return res.json({
         success: true,
-        data: unlistedIPOs,
+        data: resultData,
         lastUpdate: new Date().toISOString(),
         cached: false,
         source: 'static'
@@ -126,10 +140,12 @@ app.get('/api/ipo-list', async (req, res) => {
     ]);
 
     const mergedData = mergeAndFilterIPOData(etnetData, aastocksData, null, now, today);
+    const subscribeData = mergedData.filter(ipo => ipo.status === 'subscribe');
+    const enrichedScraperData = await webSearchService.enrichAndScoreSubscribeIPOs(subscribeData);
 
     res.json({
       success: true,
-      data: mergedData.filter(ipo => ipo.status !== 'listed'),
+      data: enrichedScraperData,
       lastUpdate: new Date().toISOString(),
       source: 'scraper'
     });
@@ -198,78 +214,9 @@ app.get('/api/subscribe-list', async (req, res) => {
         console.warn('[API] 孖展数据合并失败:', err.message);
       }
 
-      // 合并招股书数据（保荐人、基石、营收、利润等）
-      let mergedWithProspectus = mergedWithMargin;
-      try {
-        const stockCodes = mergedWithMargin.map(ipo => ipo.stockCode);
-        const prospectusMergePromises = mergedWithMargin.map(async (ipo) => {
-          try {
-            const prospectusData = await prospectusScraper.ensureProspectusData(ipo.stockCode, ipo);
-            if (prospectusData) {
-              return {
-                ...ipo,
-                // 招股书核心数据覆盖
-                underwriter: prospectusData.underwriter || ipo.underwriter,
-                cornerstone: prospectusData.cornerstone,
-                cornerstoneInvestors: prospectusData.cornerstoneInvestors || [],
-                starInvestors: prospectusData.starInvestors || [],
-                peRatio: prospectusData.peRatio,
-                revenue: prospectusData.revenue,
-                netProfit: prospectusData.netProfit,
-                revenueGrowth: prospectusData.revenueGrowth,
-                profitGrowth: prospectusData.profitGrowth,
-                profitability: prospectusData.profitability,
-                hasGreenshoe: prospectusData.hasGreenshoe,
-                isIndustryLeader: prospectusData.isIndustryLeader,
-                industry: prospectusData.industry || ipo.industry,
-                marketCap: prospectusData.marketCap || ipo.marketCap,
-                companyValue: prospectusData.companyValue || ipo.companyValue,
-                issuePrice: prospectusData.issuePrice || ipo.issuePrice,
-                sharesPerLot: prospectusData.sharesPerLot || ipo.sharesPerLot,
-                offeringShares: prospectusData.offeringShares || ipo.offeringShares,
-                totalLots: prospectusData.totalLots || ipo.totalLots,
-                publicSharesRatio: prospectusData.publicSharesRatio || ipo.publicSharesRatio,
-                description: prospectusData.description || ipo.description,
-                // 新增评分维度字段
-                hasAShare: prospectusData.hasAShare || ipo.hasAShare,
-                aShareCode: prospectusData.aShareCode || ipo.aShareCode,
-                aSharePrice: prospectusData.aSharePrice || ipo.aSharePrice,
-                ahDiscount: prospectusData.ahDiscount || ipo.ahDiscount,
-                businessModel: prospectusData.businessModel || ipo.businessModel,
-                moatLevel: prospectusData.moatLevel || ipo.moatLevel,
-                valuationLevel: prospectusData.valuationLevel || ipo.valuationLevel,
-                pbRatio: prospectusData.pbRatio || ipo.pbRatio,
-                peerPeAvg: prospectusData.peerPeAvg || ipo.peerPeAvg,
-                peerPbAvg: prospectusData.peerPbAvg || ipo.peerPbAvg,
-                businessModelReason: prospectusData.businessModelReason || ipo.businessModelReason,
-                moatReason: prospectusData.moatReason || ipo.moatReason,
-                valuationReason: prospectusData.valuationReason || ipo.valuationReason,
-                lastRoundValuation: prospectusData.lastRoundValuation || ipo.lastRoundValuation,
-              };
-            }
-            return ipo;
-          } catch (err) {
-            console.warn(`[API] 招股书数据合并失败(${ipo.stockCode}):`, err.message);
-            return ipo;
-          }
-        });
-
-        mergedWithProspectus = await Promise.all(prospectusMergePromises);
-
-        const mergedCount = mergedWithProspectus.filter(
-          (ipo, idx) => ipo.profitability !== mergedWithMargin[idx].profitability || 
-                        ipo.starInvestors?.length !== mergedWithMargin[idx].starInvestors?.length
-        ).length;
-        if (mergedCount > 0) {
-          console.log(`[API] 招股书数据合并: ${mergedCount} 条有数据更新`);
-        }
-      } catch (err) {
-        console.warn('[API] 招股书数据合并失败:', err.message);
-      }
-
       return res.json({
         success: true,
-        data: mergedWithProspectus,
+        data: mergedWithMargin,
         lastUpdate: new Date().toISOString(),
         source: 'static'
       });
@@ -499,7 +446,7 @@ app.post('/api/scoring/enrich', async (req, res) => {
     if (stockCode) {
       // 搜索指定股票
       const data = await dataProvider.getAllData();
-      const allIPOs = [...(data.subscribeIPOs || []), ...(data.upcomingIPOs || [])];
+      const allIPOs = [...(data.subscribeIPOs || [])];
       const target = allIPOs.find(ipo => ipo.stockCode === stockCode);
 
       if (!target) {
@@ -524,7 +471,7 @@ app.post('/api/scoring/enrich', async (req, res) => {
     } else {
       // 搜索所有缺少评分数据的股票
       const data = await dataProvider.getAllData();
-      const allIPOs = [...(data.subscribeIPOs || []), ...(data.upcomingIPOs || [])];
+      const allIPOs = [...(data.subscribeIPOs || [])];
       const needsEnrich = allIPOs.filter(ipo => webSearchService.needsSearch(ipo));
 
       console.log(`[API] 需要搜索补充的股票: ${needsEnrich.length} 只`);

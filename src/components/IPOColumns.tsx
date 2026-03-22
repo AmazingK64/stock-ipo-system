@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Tag, Space, Progress, Modal, Divider, Card, Typography } from 'antd';
+import {Tag, Space, Progress, Modal, Divider, Card, Typography, Button} from 'antd';
 import {
   TrophyOutlined,
   FireOutlined,
@@ -13,7 +13,9 @@ import {
   CheckCircleOutlined,
   RiseOutlined,
   CalendarOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  RobotOutlined,
+  FundOutlined
 } from '@ant-design/icons';
 import type { IPOStock } from '../types';
 import ipoScoringService from '../services/ipoScoring';
@@ -92,10 +94,10 @@ export const ScoreDetailModal: React.FC<{
   onClose: () => void;
 }> = ({ visible, record, onClose }) => {
   if (!record) return null;
-  
+
   const { items, total } = getScoreDetails(record);
   const grade = record.grade || 'N/A';
-  
+
   return (
     <Modal
       title={
@@ -112,36 +114,116 @@ export const ScoreDetailModal: React.FC<{
     >
       <div style={{ display: 'flex', gap: 16, maxHeight: 'calc(100vh - 200px)' }}>
         {/* 左侧: 评分细则 */}
-        <Card 
+        <Card
           title={<Text strong>评分细则</Text>}
           size="small"
           style={{ flex: 1.4 }}
-          styles={{ body: { padding: '12px 16px' } }}
+          styles={{ body: { padding: '12px 16px', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' } }}
         >
-          <Space direction="vertical" style={{ width: '100%' }} size="small">
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Text type="secondary" style={{ fontSize: 11, marginBottom: 8, display: 'block' }}>
+              每个评分项都包含详细打分原因，说明为什么获得相应分数
+            </Text>
             {items.map((item, index) => (
-              <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Text strong style={{ width: 72, flexShrink: 0 }}>{item.label}</Text>
-                <Tag color="blue" style={{ flexShrink: 0 }}>
-                  +{item.value}/{item.maxScore}分
-                </Tag>
-                <TextSecondary style={{ fontSize: 12, flex: 1 }}>{item.description}</TextSecondary>
+              <div key={index} style={{ marginBottom: 12, borderBottom: index < items.length - 1 ? '1px dashed #f0f0f0' : 'none', paddingBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Text strong style={{ fontSize: 13 }}>{item.label}</Text>
+                    <Tag color={item.value >= item.maxScore * 0.8 ? 'green' : item.value >= item.maxScore * 0.6 ? 'blue' : item.value >= item.maxScore * 0.4 ? 'orange' : 'red'}>
+                      +{item.value}/{item.maxScore}分
+                    </Tag>
+                  </div>
+                  <Text type="secondary" style={{ fontSize: 11 }}>{item.description}</Text>
+                </div>
+                <div style={{ backgroundColor: '#fafafa', padding: '8px 12px', borderRadius: 4 }}>
+                  <Text type="secondary" style={{ fontSize: 11, lineHeight: 1.5 }}>
+                    <strong>打分原因:</strong> {item.reason || '未提供详细打分原因'}
+                  </Text>
+                </div>
               </div>
             ))}
             <Divider style={{ margin: '8px 0' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Text strong style={{ width: 60, flexShrink: 0, fontSize: 14 }}>总分</Text>
-              <Tag color="green" style={{ fontWeight: 'bold' }}>
-                {total}分
-              </Tag>
-              <Tag
-                color={getGradeColor(grade)}
-                icon={getGradeIcon(grade)}
-                style={{ fontWeight: 'bold' }}
-              >
-                {grade}
-              </Tag>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <Text strong style={{ fontSize: 14 }}>总分</Text>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                  基于以上{items.length}个维度综合评分
+                </Text>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Tag color="green" style={{ fontWeight: 'bold', fontSize: 14 }}>
+                  {total}分
+                </Tag>
+                <Tag
+                  color={getGradeColor(grade)}
+                  icon={getGradeIcon(grade)}
+                  style={{ fontWeight: 'bold', fontSize: 14 }}
+                >
+                  {grade}级
+                </Tag>
+              </div>
             </div>
+
+            {/* LLM 评分依据与策略建议 */}
+            {record.llmScoringReason && (
+              <>
+                <Divider style={{ margin: '12px 0' }} />
+                <Card
+                  size="small"
+                  title={<Space><RobotOutlined style={{ color: '#722ed1' }} /><Text strong style={{ color: '#722ed1' }}>AI 评分依据</Text></Space>}
+                  style={{ backgroundColor: '#fafafa', border: '1px solid #d3b3ff' }}
+                  styles={{ body: { padding: '12px' } }}
+                >
+                  <Text style={{ fontSize: 12, lineHeight: 1.6 }}>
+                    {record.llmScoringReason}
+                  </Text>
+                </Card>
+              </>
+            )}
+
+            {record.strategy && (
+              <>
+                <Divider style={{ margin: '12px 0' }} />
+                <Card
+                  size="small"
+                  title={<Space><FundOutlined style={{ color: '#1890ff' }} /><Text strong>AI 策略建议</Text></Space>}
+                  style={{ backgroundColor: '#f6ffed', border: '1px solid #b7eb8f' }}
+                  styles={{ body: { padding: '12px' } }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }} size="small">
+                    <div>
+                      <Text strong style={{ fontSize: 12 }}>总体建议：</Text>
+                      <Text style={{ fontSize: 12 }}>{record.strategy.recommendation || '未提供'}</Text>
+                    </div>
+                    <div>
+                      <Text strong style={{ fontSize: 12 }}>具体操作：</Text>
+                      <Text style={{ fontSize: 12 }}>{record.strategy.action || '未提供'}</Text>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      <div>
+                        <Text strong style={{ fontSize: 12 }}>风险等级：</Text>
+                        <Tag color={
+                          record.strategy.riskLevel === '低' ? 'green' :
+                          record.strategy.riskLevel === '中' || record.strategy.riskLevel === '中高' ? 'orange' : 'red'
+                        } style={{ marginLeft: 4 }}>
+                          {record.strategy.riskLevel || '未知'}
+                        </Tag>
+                      </div>
+                      <div>
+                        <Text strong style={{ fontSize: 12 }}>预期收益：</Text>
+                        <Tag color={
+                          record.strategy.expectedReturn === '高' ? 'green' :
+                          record.strategy.expectedReturn === '中' ? 'blue' :
+                          record.strategy.expectedReturn === '中高' ? 'orange' : 'default'
+                        } style={{ marginLeft: 4 }}>
+                          {record.strategy.expectedReturn || '未知'}
+                        </Tag>
+                      </div>
+                    </div>
+                  </Space>
+                </Card>
+              </>
+            )}
           </Space>
         </Card>
 
@@ -154,106 +236,119 @@ export const ScoreDetailModal: React.FC<{
         >
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
             <Text type="secondary" style={{ fontSize: 11, marginBottom: 4, display: 'block' }}>
-              评分维度: 行业热度(30) + 保荐人(18) + 投资者(16) + 商业模式(17) + 估值(10) + 绿鞋(5) + AH折价(2) + 盈利(2)
+              评分维度: 赛道与细分行业(20) + 公司规模(15) + 业绩与成长性(18) + 估值与定价(15) + 发行中介与结构(22) + 合规与风险(10)
             </Text>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A+</Tag>
+                <Tag color="#f50" style={{ fontWeight: 'bold', flexShrink: 0 }}>S</Tag>
                 <Text type="secondary" style={{ fontSize: 11 }}>80分以上</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                顶级优质标的。行业领先且风口明确；顶级保荐人+知名基石加持；商业模式清晰，护城河宽；估值便宜或合理。
+                顶级优质港股标的。赛道稀缺且成长空间巨大；顶级发行中介阵容；业绩持续高增长；估值显著低于同行；合规记录完美。
               </Text>
               <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：可融资申购，积极参与
+                建议：全力融资申购，重仓配置
+              </TextSuccess>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>75-79分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                顶级港股标的。赛道前景明确且竞争格局良好；强大发行中介支持；业绩稳定增长；估值合理或略低于同行。
+              </Text>
+              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：积极融资申购，中等仓位
               </TextSuccess>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>72-79分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>70-74分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                优质标的。行业前景良好，有一定竞争力；知名保荐人；有基石投资者；商业模式清晰，估值合理。
+                优质港股标的。赛道具备成长性；有知名保荐人支持；业绩表现良好；估值与行业相当；风险较低。
               </Text>
-              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：可融资申购，建议参与
-              </TextSuccess>
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
+                建议：融资申购为主，关注市场情绪
+              </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#52c41a" style={{ fontWeight: 'bold', flexShrink: 0 }}>A-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>65-71分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>65-69分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                良好标的。行业有一定成长空间；有保荐人支持；商业模式较清晰，护城河中等；估值相对合理。
+                良好港股标的。赛道有成长空间；有保荐人支持；商业模式清晰，护城河中等；估值合理或略高。
               </Text>
-              <TextSuccess style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：可适度参与，优先现金申购
-              </TextSuccess>
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
+                建议：现金申购为主，适量融资
+              </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>58-64分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>60-64分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中上水平。行业前景尚可；保荐人资质普通；商业模式一般，护城河窄；估值略高。
+                中上港股标的。赛道有成长潜力；保荐人资质中等；商业模式可行；估值略高或合理；需关注风险点。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
-                建议：谨慎参与，优先现金申购
+                建议：现金申购为主，少量融资
               </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>48-57分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>55-59分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中等水平。行业竞争较激烈；保荐人资质一般；商业模式不突出；估值偏高。
+                中等港股标的。行业竞争激烈；保荐人资质一般；商业模式普通；估值偏高；存在一定风险。
               </Text>
-              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#1890ff' }}>
-                建议：少量参与或不参与
+              <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#faad14' }}>
+                建议：少量现金申购，保持关注
               </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#1890ff" style={{ fontWeight: 'bold', flexShrink: 0 }}>B-</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>38-47分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>50-54分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                中下水平。行业前景不明朗；缺乏明显竞争优势；保荐人实力有限；估值偏高。
+                中下港股标的。行业前景一般；缺乏明显优势；保荐人实力有限；估值明显偏高；风险较高。
               </Text>
               <Text style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2, color: '#faad14' }}>
-                建议：观望为主
+                建议：谨慎参与或不参与
               </Text>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C+</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>28-37分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>45-49分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                较差标的。行业前景欠佳；缺乏核心竞争力；保荐人资质较差；估值明显偏高。
+                较差港股标的。行业前景不明；商业模式不清晰；保荐人资质较差；估值显著偏高；多风险因素。
               </Text>
               <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：谨慎或不参与
+                建议：不推荐申购
               </TextDanger>
             </div>
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>18-27分</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>40-44分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                差标的。行业前景黯淡；竞争力薄弱；保荐人实力不足；估值显著偏高。
+                差港股标的。行业前景黯淡；竞争力弱；保荐人实力不足；估值昂贵；重大风险暴露。
               </Text>
               <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
                 建议：不参与
@@ -262,14 +357,66 @@ export const ScoreDetailModal: React.FC<{
             <Divider style={{ margin: '4px 0' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>18分以下</Text>
+                <Tag color="#faad14" style={{ fontWeight: 'bold', flexShrink: 0 }}>C-</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>35-39分</Text>
               </div>
               <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
-                风险极高。基本面较差或信息不充分。
+                风险较高标的。基本面问题较多；发行结构复杂；估值过高；合规风险高。
               </Text>
               <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
-                建议：不参与
+                建议：坚决不参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D+</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>30-34分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                高风险标的。多风险因素并存；盈利前景差；发行结构不合理；合规问题。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：避免参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>25-29分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                极高风险标的。基本面严重问题；发行风险高；重大合规瑕疵；商业模式不可持续。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：坚决不参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#ff4d4f" style={{ fontWeight: 'bold', flexShrink: 0 }}>D-</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>20-24分</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                极高风险标的。多重大风险；不建议申购；存在退市风险。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：坚决不参与
+              </TextDanger>
+            </div>
+            <Divider style={{ margin: '4px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Tag color="#8c8c8c" style={{ fontWeight: 'bold', flexShrink: 0 }}>F</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>20分以下</Text>
+              </div>
+              <Text style={{ fontSize: 12, display: 'block', marginLeft: 4 }}>
+                不合格标的。基本面或发行存在重大缺陷；不建议申购；极高风险。
+              </Text>
+              <TextDanger style={{ fontSize: 11, display: 'block', marginLeft: 4, marginTop: 2 }}>
+                建议：坚决不参与
               </TextDanger>
             </div>
             <Divider style={{ margin: '8px 0' }} />
@@ -285,7 +432,8 @@ export const ScoreDetailModal: React.FC<{
 
 /** 表格列定义 - 申购/即将上市 */
 export const getIPOColumns = (
-  onScoreClick: (record: IPOStock) => void
+  onScoreClick: (record: IPOStock) => void,
+  onAIWorkflowClick?: (record: IPOStock) => void
 ) => [
   {
     title: '股票代码',
@@ -357,8 +505,8 @@ export const getIPOColumns = (
       if (!totalLots || totalLots === 0) return <TextSecondary>-</TextSecondary>;
       return (
         <TextSecondary>
-          {totalLots >= 10000 
-            ? `${(totalLots / 10000).toFixed(1)}万手` 
+          {totalLots >= 10000
+            ? `${(totalLots / 10000).toFixed(1)}万手`
             : `${totalLots}手`}
         </TextSecondary>
       );
@@ -377,7 +525,7 @@ export const getIPOColumns = (
     key: 'score',
     width: 110,
     render: (score: number, record: IPOStock) => (
-      <div 
+      <div
         style={{ cursor: 'pointer' }}
         onClick={() => onScoreClick(record)}
       >
@@ -401,7 +549,7 @@ export const getIPOColumns = (
     key: 'grade',
     width: 70,
     render: (grade: string, record: IPOStock) => (
-      <div 
+      <div
         style={{ cursor: 'pointer' }}
         onClick={() => onScoreClick(record)}
       >
@@ -413,6 +561,22 @@ export const getIPOColumns = (
           {grade || 'N/A'}
         </Tag>
       </div>
+    ),
+  },
+  {
+    title: 'AI分析',
+    key: 'aiAnalysis',
+    width: 90,
+    render: (_: any, record: IPOStock) => (
+      <Button
+        type="link"
+        size="small"
+        onClick={() => onAIWorkflowClick && onAIWorkflowClick(record)}
+        icon={<RobotOutlined />}
+        style={{ color: '#722ed1' }}
+      >
+        深度分析
+      </Button>
     ),
   },
   {

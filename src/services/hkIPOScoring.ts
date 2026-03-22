@@ -370,8 +370,39 @@ class HKIPOScoringService {
    * 从IPO数据中提取营收数值 (单位: 亿港元)
    */
   private extractRevenue(ipoData: IRawIPOData): number | null {
-    // 这里需要实际的营收数据，暂时返回null
-    // 实际项目中应从ipoData中获取营收字段
+    if (typeof ipoData.revenue === 'number' && Number.isFinite(ipoData.revenue) && ipoData.revenue > 0) {
+      return ipoData.revenue;
+    }
+
+    const candidateTexts: string[] = [];
+    const rawRevenue = (ipoData as unknown as { revenue?: unknown }).revenue;
+    if (typeof rawRevenue === 'string') {
+      candidateTexts.push(rawRevenue);
+    }
+
+    const description = (ipoData as unknown as { description?: unknown }).description;
+    if (typeof description === 'string') {
+      candidateTexts.push(description);
+    }
+
+    for (const text of candidateTexts) {
+      const yiMatch = text.match(/(\d+(?:\.\d+)?)\s*亿/);
+      if (yiMatch) {
+        const yiValue = parseFloat(yiMatch[1]);
+        if (!Number.isNaN(yiValue) && yiValue > 0) {
+          return yiValue;
+        }
+      }
+
+      const wanMatch = text.match(/(\d+(?:\.\d+)?)\s*万/);
+      if (wanMatch) {
+        const wanValue = parseFloat(wanMatch[1]);
+        if (!Number.isNaN(wanValue) && wanValue > 0) {
+          return wanValue / 10000;
+        }
+      }
+    }
+
     return null;
   }
 
@@ -531,10 +562,10 @@ class HKIPOScoringService {
    * 获取评分详情
    */
   getScoreDetails(ipoData: IRawIPOData): {
-    items: Array<{ label: string; value: number; maxScore: number; description: string }>;
+    items: Array<{ label: string; value: number; maxScore: number; description: string; reason?: string }>;
     total: number;
   } {
-    const items: Array<{ label: string; value: number; maxScore: number; description: string }> = [];
+    const items: Array<{ label: string; value: number; maxScore: number; description: string; reason?: string }> = [];
     let total = 0;
 
     // 1. 赛道与细分行业
@@ -543,7 +574,8 @@ class HKIPOScoringService {
       label: '赛道与细分行业',
       value: industryScore,
       maxScore: 20,
-      description: ipoData.industry || '未披露'
+      description: ipoData.industry || '未披露',
+      reason: ipoData.industry ? `${ipoData.industry}行业，根据行业热度和成长性评分` : '行业信息未披露'
     });
     total += industryScore;
 
@@ -554,29 +586,37 @@ class HKIPOScoringService {
       label: '公司规模',
       value: sizeScore,
       maxScore: 15,
-      description: `市值: ${marketCap !== null ? marketCap + '亿港元' : '待定'} | 营收: 招股书数据`
+      description: `市值: ${marketCap !== null ? marketCap + '亿港元' : '待定'} | 营收: 招股书数据`,
+      reason: marketCap !== null ? `市值${marketCap}亿港元，根据规模评分` : '市值信息待定'
     });
     total += sizeScore;
 
     // 3. 业绩与成长性
     const performanceScore = this.calculatePerformanceScore(ipoData);
     let perfDesc = '招股书数据';
+    let perfReason = '根据招股书业绩数据评分';
     if (ipoData.profitability === 'profitable') {
       perfDesc = `盈利${ipoData.profitGrowth && ipoData.profitGrowth > 0 ? '且增长' : ''}`;
+      perfReason = ipoData.profitGrowth && ipoData.profitGrowth > 0 
+        ? `公司盈利且利润增长${(ipoData.profitGrowth * 100).toFixed(1)}%` 
+        : '公司盈利';
     } else if (ipoData.profitability === 'loss') {
       perfDesc = '亏损中';
+      perfReason = '公司目前处于亏损状态';
     }
     items.push({
       label: '业绩与成长性',
       value: performanceScore,
       maxScore: 18,
-      description: perfDesc
+      description: perfDesc,
+      reason: perfReason
     });
     total += performanceScore;
 
     // 4. 估值与定价
     const valuationScore = this.calculateValuationScore(ipoData);
     let valDesc = '招股书数据';
+    let valReason = '根据估值水平评分';
     if (ipoData.valuationLevel) {
       const valMap: Record<string, string> = {
         cheap: '估值便宜',
@@ -585,26 +625,33 @@ class HKIPOScoringService {
         expensive: '估值昂贵'
       };
       valDesc = valMap[ipoData.valuationLevel] || ipoData.valuationLevel;
+      valReason = ipoData.valuationReason || valDesc;
     }
     items.push({
       label: '估值与定价',
       value: valuationScore,
       maxScore: 15,
-      description: valDesc
+      description: valDesc,
+      reason: valReason
     });
     total += valuationScore;
 
     // 5. 发行中介与结构
     const structureScore = this.calculateStructureScore(ipoData);
     let structureDesc = '';
+    let structureReason = '根据发行结构和中介机构评分';
     if (ipoData.underwriter) structureDesc += `保荐: ${ipoData.underwriter} `;
     if (ipoData.cornerstone) structureDesc += `有基石 `;
     if (ipoData.hasGreenshoe) structureDesc += `有绿鞋`;
+    if (ipoData.underwriter) structureReason = `保荐人${ipoData.underwriter}`;
+    if (ipoData.cornerstone) structureReason += '，有基石投资者';
+    if (ipoData.hasGreenshoe) structureReason += '，有绿鞋机制';
     items.push({
       label: '发行中介与结构',
       value: structureScore,
       maxScore: 22,
-      description: structureDesc || '招股书数据'
+      description: structureDesc || '招股书数据',
+      reason: structureReason
     });
     total += structureScore;
 
@@ -614,7 +661,8 @@ class HKIPOScoringService {
       label: '合规与风险',
       value: complianceScore,
       maxScore: 10,
-      description: '回拨机制、募资用途、重大风险等'
+      description: '回拨机制、募资用途、重大风险等',
+      reason: '根据合规性和风险因素评分'
     });
     total += complianceScore;
 

@@ -1,18 +1,28 @@
 /**
  * IPO评分服务
  * 包含评分计算、等级评定、策略建议等核心逻辑
+ * 支持两种评分策略: 通用评分和港股专用评分
  *
- * 评分体系 (满分100分，8个维度):
- * 1. 行业热度 (30分) - AI/半导体等风口行业最高
- * 2. 保荐人 (18分) - 中金/摩根等第一梯队最高
+ * 通用评分体系 (满分100分，8个维度):
+ * 1. 行业热度 (35分) - AI/半导体等风口行业最高
+ * 2. 保荐人 (20分) - 中金/摩根等第一梯队最高
  * 3. 投资者背景 (16分) - 基石+知名机构最高
- * 4. 商业模式 (17分) - 清晰可持续+宽护城河最高
+ * 4. 商业模式 (10分) - 清晰可持续+宽护城河最高（含小红书讨论加成）
  * 5. 估值合理性 (10分) - 便宜(vs同行)最高
  * 6. 绿鞋机制 (5分) - 有则+5
  * 7. AH折价 (2分) - 非A+H=1分，A+H折价≥50%=2分
  * 8. 盈利能力 (2分) - 亏损=0，盈利=1，高增长=2
+ *
+ * 港股专用评分体系 (优化精细版・总分100):
+ * 1. 赛道与细分行业 (20分)
+ * 2. 公司规模 (市值 / 营收) (15分)
+ * 3. 业绩与成长性 (18分)
+ * 4. 估值与定价 (15分)
+ * 5. 发行中介与结构 (22分)
+ * 6. 合规与风险 (10分)
  */
 import type { IRawIPOData, IPOStrategy } from '../types';
+import HKIPOScoringService from './hkIPOScoring';
 
 /**
  * IPO评分配置
@@ -54,22 +64,22 @@ export const defaultScoreConfig: IScoreConfig = {
   industryTier3: ['印制电路板', '智能物流机器人', '消费电子', '科技', '互联网'],
   industryTier4: ['医药', '制药', '生物科技', '医疗服务', '医疗健康'],
   industryTier5: ['家电', '空调', '白色家电', '厨卫电器', '照明', '卫浴', '银行', '保险', '房地产', '建筑', '零售', '餐饮', '教育', '传媒'],
-  industryScores: [30, 24, 20, 15, 8],
+  industryScores: [35, 28, 22, 15, 8],
 
   // 保荐人分类
   underwriterTier1: ['中金公司', '摩根士丹利', '高盛'],
   underwriterTier2: ['中信证券', '华泰国际', '华泰金融控股', '招银国际', '美银证券', '瑞银', '花旗', '国泰君安', '海通国际', '中银国际'],
   underwriterTier3: ['建银国际', '工银国际', '交银国际', '光大证券', '兴业证券', '银河证券'],
-  underwriterScores: [18, 14, 9],
+  underwriterScores: [20, 16, 10],
 
   // 知名机构
   topInvestors: ['腾讯', '阿里', '百度', '京东', '美团', '字节', '红杉', '高瓴', 'IDG', '经纬', '启明', '礼来', '高盛', '摩根', '贝莱德', '先锋', '富达', 'CPE', '景林', '霸菱', 'UBS'],
 
-  // 等级门槛（满分100分）
+  // 等级门槛（满分100分） - 按新要求调整
   gradeThresholds: {
-    A_plus: 80,
-    A: 72,
-    A_minus: 65,
+    A_plus: 75,   // 原80 -> 75
+    A: 70,        // 原72 -> 70
+    A_minus: 65,  // 保持不变
     B_plus: 58,
     B: 48,
     B_minus: 38,
@@ -80,6 +90,21 @@ export const defaultScoreConfig: IScoreConfig = {
 
 class IPOScoringService {
   private config: IScoreConfig = defaultScoreConfig;
+  private useHKStrategy: boolean = true;
+  private readonly strategyStorageKey = 'ipo_scoring_use_hk_strategy';
+
+  constructor() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const savedStrategy = window.localStorage.getItem(this.strategyStorageKey);
+    if (savedStrategy === 'true') {
+      this.useHKStrategy = true;
+    } else if (savedStrategy === 'false') {
+      this.useHKStrategy = false;
+    }
+  }
 
   /**
    * 更新评分配置
@@ -96,10 +121,32 @@ class IPOScoringService {
   }
 
   /**
+   * 切换评分策略
+   */
+  setStrategy(useHKStrategy: boolean): void {
+    this.useHKStrategy = useHKStrategy;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(this.strategyStorageKey, String(useHKStrategy));
+    }
+  }
+
+  /**
+   * 获取当前评分策略
+   */
+  getCurrentStrategy(): string {
+    return this.useHKStrategy ? '港股专用评分策略' : '通用评分策略';
+  }
+
+  /**
    * 计算新股评分 (满分100分)
-   * 维度: 行业热度(30) + 保荐人(18) + 投资者(16) + 商业模式(17) + 估值(10) + 绿鞋(5) + AH折价(2) + 盈利(2)
+   * 根据策略选择使用通用评分或港股专用评分
    */
   calculateScore(ipoData: IRawIPOData): number {
+    if (this.useHKStrategy) {
+      return HKIPOScoringService.calculateScore(ipoData);
+    }
+
+    // 通用评分策略
     let score = 0;
 
     // ========== 1. 行业热度评分 (最高30分) ==========
@@ -183,43 +230,44 @@ class IPOScoringService {
   }
 
   /**
-   * 计算商业模式评分 (最高17分)
+   * 计算商业模式评分 (最高10分)
    * 评估维度: 商业模式清晰度、可持续性、护城河宽度
+   * 小红书讨论正面信号可额外加分
    *
-   * excellent + wide: 17分 - 商业模式清晰可持续，护城河宽
-   * excellent + moderate: 14分
-   * good + wide: 12分
-   * good + moderate: 9分 - 商业模式较清晰，有一定护城河
-   * fair + narrow: 5分 - 商业模式一般
-   * poor + none: 2分 - 商业模式不清晰
+   * excellent + wide: 10分 - 商业模式清晰可持续，护城河宽
+   * excellent + moderate: 8分
+   * good + wide: 7分
+   * good + moderate: 5分 - 商业模式较清晰，有一定护城河
+   * fair + narrow: 3分 - 商业模式一般
+   * poor + none: 1分 - 商业模式不清晰
    */
   private calculateBusinessModelScore(ipoData: IRawIPOData): number {
     const model = ipoData.businessModel;
     const moat = ipoData.moatLevel;
 
-    if (!model) return 4; // 无数据默认4分
+    if (!model) return 3; // 无数据默认3分
 
     let score = 0;
 
-    // 基于商业模式评分 (0-10分)
+    // 基于商业模式评分 (0-6分)
     switch (model) {
-      case 'excellent': score = 10; break;
-      case 'good': score = 7; break;
-      case 'fair': score = 4; break;
-      case 'poor': score = 2; break;
-      default: score = 4;
+      case 'excellent': score = 6; break;
+      case 'good': score = 4; break;
+      case 'fair': score = 2; break;
+      case 'poor': score = 1; break;
+      default: score = 2;
     }
 
-    // 基于护城河调整 (+0-7分)
+    // 基于护城河调整 (+0-4分)
     switch (moat) {
-      case 'wide': score += 7; break;
-      case 'moderate': score += 4; break;
+      case 'wide': score += 4; break;
+      case 'moderate': score += 2; break;
       case 'narrow': score += 1; break;
       case 'none': score += 0; break;
       default: break;
     }
 
-    return Math.min(score, 17); // 最高17分
+    return Math.min(score, 10); // 最高10分
   }
 
   /**
@@ -332,68 +380,111 @@ class IPOScoringService {
    * 获取评分详情
    */
   getScoreDetails(ipoData: IRawIPOData): {
-    items: Array<{ label: string; value: number; maxScore: number; description: string }>;
+    items: Array<{ 
+      label: string; 
+      value: number; 
+      maxScore: number; 
+      description: string;
+      reason?: string;  // 新增：详细打分原因
+    }>;
     total: number;
   } {
-    const items: Array<{ label: string; value: number; maxScore: number; description: string }> = [];
+    if (this.useHKStrategy) {
+      return HKIPOScoringService.getScoreDetails(ipoData);
+    }
+
+    // 通用评分策略详情
+    const items: Array<{ 
+      label: string; 
+      value: number; 
+      maxScore: number; 
+      description: string;
+      reason?: string;
+    }> = [];
     let total = 0;
 
-    // ========== 1. 行业热度 (30分) ==========
+    // ========== 1. 行业热度 (35分) ==========
     const industryScore = this.calculateIndustryScore(ipoData);
     let industryDesc = '未披露';
+    let industryReason = '行业信息未披露，按默认中等分数计算';
     if (ipoData.industry) {
       const { industryTier1, industryTier2, industryTier3, industryTier4, industryTier5 } = this.config;
       if (industryTier1.some(kw => ipoData.industry!.includes(kw))) {
         industryDesc = '风口行业 (AI/机器人/新能源/半导体)';
+        industryReason = `${ipoData.industry}属于第一梯队风口行业，享有最高35分评分，代表未来高成长性和市场关注度`;
       } else if (industryTier2.some(kw => ipoData.industry!.includes(kw))) {
         industryDesc = '热门赛道 (新能源汽车/云计算/智能驾驶)';
+        industryReason = `${ipoData.industry}属于第二梯队热门赛道，获得28分评分，市场热度较高，成长性良好`;
       } else if (industryTier3.some(kw => ipoData.industry!.includes(kw))) {
         industryDesc = '科技行业';
+        industryReason = `${ipoData.industry}属于第三梯队科技行业，获得22分评分，具备技术含量但竞争相对激烈`;
       } else if (industryTier4.some(kw => ipoData.industry!.includes(kw))) {
         industryDesc = '医药/医疗健康';
+        industryReason = `${ipoData.industry}属于第四梯队医药医疗行业，获得15分评分，防御性较强但成长性一般`;
       } else if (industryTier5.some(kw => ipoData.industry!.includes(kw))) {
         industryDesc = '传统行业';
+        industryReason = `${ipoData.industry}属于第五梯队传统行业，获得8分评分，成长性有限，市场关注度低`;
       } else {
         industryDesc = '其他行业';
+        industryReason = `${ipoData.industry}不属于预设行业梯队，按中等水平获得12分评分`;
       }
     }
-    items.push({ label: '行业热度', value: industryScore, maxScore: 30, description: industryDesc });
+    items.push({ label: '行业热度', value: industryScore, maxScore: 35, description: industryDesc, reason: industryReason });
     total += industryScore;
 
-    // ========== 2. 保荐人 (18分) ==========
+    // ========== 2. 保荐人 (20分) ==========
     const underwriterScore = this.calculateUnderwriterScore(ipoData);
     let underwriterDesc = '未披露';
+    let underwriterReason = '保荐人信息未披露，按最低分数6分计算';
     if (ipoData.underwriter) {
       const { underwriterTier1, underwriterTier2, underwriterTier3 } = this.config;
       if (underwriterTier1.some(kw => ipoData.underwriter!.includes(kw))) {
         underwriterDesc = `第一梯队 (${ipoData.underwriter})`;
+        underwriterReason = `${ipoData.underwriter}属于第一梯队保荐人（中金/摩根/高盛），获得最高20分评分，代表强大的发行能力和定价话语权`;
       } else if (underwriterTier2.some(kw => ipoData.underwriter!.includes(kw))) {
         underwriterDesc = `第二梯队 (${ipoData.underwriter})`;
+        underwriterReason = `${ipoData.underwriter}属于第二梯队保荐人（中信/华泰/招银国际等），获得16分评分，具备较强的发行经验和资源`;
       } else if (underwriterTier3.some(kw => ipoData.underwriter!.includes(kw))) {
         underwriterDesc = `第三梯队 (${ipoData.underwriter})`;
+        underwriterReason = `${ipoData.underwriter}属于第三梯队保荐人（建银/工银/交银等），获得10分评分，发行能力一般`;
       } else {
         underwriterDesc = `其他 (${ipoData.underwriter})`;
+        underwriterReason = `${ipoData.underwriter}不属于预设梯队，按最低6分评分`;
       }
     }
-    items.push({ label: '保荐人', value: underwriterScore, maxScore: 18, description: underwriterDesc });
+    items.push({ label: '保荐人', value: underwriterScore, maxScore: 20, description: underwriterDesc, reason: underwriterReason });
     total += underwriterScore;
 
     // ========== 3. 投资者背景 (16分) ==========
     const investorScore = this.calculateInvestorScore(ipoData);
     let investorDesc = '无特殊投资者';
+    let investorReason = '无基石投资者且无知名机构参与，获得0分评分';
     const starInvestors = ipoData.starInvestors || [];
     const { topInvestors } = this.config;
     const topInvestorCount = starInvestors.filter((inv: string) =>
       topInvestors.some(ti => inv.includes(ti))
     ).length;
     if (ipoData.cornerstone) {
-      if (topInvestorCount >= 3) investorDesc = `基石+知名机构(${topInvestorCount}家)`;
-      else if (topInvestorCount >= 1) investorDesc = `基石+知名机构(${topInvestorCount}家)`;
-      else investorDesc = '基石投资者';
+      if (topInvestorCount >= 3) {
+        investorDesc = `基石+知名机构(${topInvestorCount}家)`;
+        investorReason = `有基石投资者且包含${topInvestorCount}家知名机构（${starInvestors.slice(0, 3).join('、')}），获得最高16分评分`;
+      } else if (topInvestorCount >= 1) {
+        investorDesc = `基石+知名机构(${topInvestorCount}家)`;
+        investorReason = `有基石投资者且包含${topInvestorCount}家知名机构，获得13分评分`;
+      } else {
+        investorDesc = '基石投资者';
+        investorReason = '有基石投资者但无知名机构参与，获得9分评分';
+      }
     } else if (starInvestors.length > 0) {
-      investorDesc = `明星投资者(${starInvestors.length}家)`;
+      if (starInvestors.length >= 3) {
+        investorDesc = `明星投资者(${starInvestors.length}家)`;
+        investorReason = `无基石投资者但有${starInvestors.length}家明星机构参与，获得6分评分`;
+      } else if (starInvestors.length >= 1) {
+        investorDesc = `明星投资者(${starInvestors.length}家)`;
+        investorReason = `无基石投资者但有${starInvestors.length}家明星机构参与，获得4分评分`;
+      }
     }
-    items.push({ label: '投资者背景', value: investorScore, maxScore: 16, description: investorDesc });
+    items.push({ label: '投资者背景', value: investorScore, maxScore: 16, description: investorDesc, reason: investorReason });
     total += investorScore;
 
     // ========== 4. 商业模式 (17分) ==========
@@ -416,7 +507,7 @@ class IPOScoringService {
       const moatText = ipoData.moatLevel ? `, ${moatMap[ipoData.moatLevel] || ''}` : '';
       bmDesc = `${modelText}${moatText}`;
     }
-    items.push({ label: '商业模式', value: bmScore, maxScore: 17, description: bmDesc });
+    items.push({ label: '商业模式', value: bmScore, maxScore: 10, description: bmDesc });
     total += bmScore;
 
     // ========== 5. 估值合理性 (10分) ==========
@@ -494,51 +585,74 @@ class IPOScoringService {
 
   /**
    * 根据评分获取等级 (满分100分)
+   * 阈值: S(≥80), A+(75-79), A(70-74), A-(65-69), B+(58-64), B(48-57), B-(38-47), C+(28-37), C(18-27), D(10-17), F(<10)
    */
   getGrade(score: number): string {
-    const thresholds = this.config.gradeThresholds;
-    if (score >= thresholds.A_plus) return 'A+';
-    if (score >= thresholds.A) return 'A';
-    if (score >= thresholds.A_minus) return 'A-';
-    if (score >= thresholds.B_plus) return 'B+';
-    if (score >= thresholds.B) return 'B';
-    if (score >= thresholds.B_minus) return 'B-';
-    if (score >= thresholds.C_plus) return 'C+';
-    if (score >= thresholds.C) return 'C';
-    return 'D';
+    if (this.useHKStrategy) {
+      return HKIPOScoringService.getGrade(score);
+    }
+    
+    // 新等级标准
+    if (score >= 80) return 'S';
+    if (score >= 75) return 'A+';
+    if (score >= 70) return 'A';
+    if (score >= 65) return 'A-';
+    if (score >= 58) return 'B+';
+    if (score >= 48) return 'B';
+    if (score >= 38) return 'B-';
+    if (score >= 28) return 'C+';
+    if (score >= 18) return 'C';
+    if (score >= 10) return 'D';
+    return 'F';
   }
 
   /**
    * 生成打新策略建议
    */
-  generateStrategy(_score: number, grade: string): IPOStrategy {
+  generateStrategy(score: number, grade: string): IPOStrategy {
+    if (this.useHKStrategy) {
+      const hkStrategy = HKIPOScoringService.generateStrategy(score, grade);
+      return {
+        recommendation: hkStrategy.recommendation,
+        action: hkStrategy.action,
+        riskLevel: hkStrategy.riskLevel,
+        expectedReturn: hkStrategy.expectedReturn,
+        allocation: hkStrategy.allocation
+      };
+    }
+
+    // 通用评分策略建议
     if (grade.startsWith('A')) {
       return {
         recommendation: '强烈推荐',
         action: '建议积极参与,可融资申购',
         riskLevel: '低',
-        expectedReturn: '30-50%'
+        expectedReturn: '30-50%',
+        allocation: '中等仓位'
       };
     } else if (grade.startsWith('B')) {
       return {
         recommendation: '推荐',
         action: '建议现金申购',
         riskLevel: '中',
-        expectedReturn: '15-30%'
+        expectedReturn: '15-30%',
+        allocation: '轻仓位'
       };
     } else if (grade.startsWith('C')) {
       return {
         recommendation: '谨慎',
         action: '少量参与或不参与',
         riskLevel: '高',
-        expectedReturn: '5-15%'
+        expectedReturn: '5-15%',
+        allocation: '极轻仓位'
       };
     } else {
       return {
         recommendation: '不推荐',
         action: '不建议参与',
         riskLevel: '极高',
-        expectedReturn: '不确定'
+        expectedReturn: '不确定',
+        allocation: '不参与'
       };
     }
   }

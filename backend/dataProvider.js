@@ -10,7 +10,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const prospectusScraper = require('./scraper/prospectus-scraper');
 
 // 静态数据文件路径
 const STATIC_DATA_FILE = path.join(__dirname, 'data', 'ipo-data-20260320.json');
@@ -102,102 +101,17 @@ class DataProvider {
   }
 
   /**
-   * 获取所有未上市的新股（申购中 + 即将上市）
+   * 获取用于打新的新股（仅申购中）
    * 用于后端API /api/ipo-list
    */
   async getAllUnlistedIPOs() {
     const data = await this.getAllData();
-
-    // 过滤掉已上市的股票
-    const unlisted = [];
-
-    // 添加申购中的
-    for (const ipo of (data.subscribeIPOs || [])) {
-      try {
-        // 确保有招股书数据（如果没有会自动获取或创建）
-        const prospectusData = await prospectusScraper.ensureProspectusData(
-          ipo.stockCode, 
-          {
-            stockName: ipo.stockName,
-            industry: ipo.industry,
-            issuePrice: ipo.issuePrice,
-            underwriter: ipo.underwriter,
-            description: ipo.description
-          }
-        );
-        
-        // 安全合并数据
-        const mergedData = {
-          ...ipo,
-          ...(prospectusData || {}), // 确保 prospectusData 不为 null
-          status: 'subscribe'
-        };
-        
-        // 确保数组字段存在
-        if (!mergedData.starInvestors) {
-          mergedData.starInvestors = [];
-        }
-        if (!mergedData.cornerstoneInvestors) {
-          mergedData.cornerstoneInvestors = [];
-        }
-        
-        unlisted.push(mergedData);
-      } catch (error) {
-        console.error(`[DataProvider] 处理申购股票 ${ipo.stockCode} 失败:`, error);
-        // 即使出错也要添加基本信息
-        unlisted.push({
-          ...ipo,
-          status: 'subscribe',
-          starInvestors: [],
-          cornerstoneInvestors: []
-        });
-      }
-    }
-
-    // 添加即将上市的（已截止申购但还未上市）
-    for (const ipo of (data.upcomingIPOs || [])) {
-      try {
-        // 确保有招股书数据
-        const prospectusData = await prospectusScraper.ensureProspectusData(
-          ipo.stockCode,
-          {
-            stockName: ipo.stockName,
-            industry: ipo.industry,
-            issuePrice: ipo.issuePrice,
-            underwriter: ipo.underwriter,
-            description: ipo.description
-          }
-        );
-        
-        // 安全合并数据
-        const mergedData = {
-          ...ipo,
-          ...(prospectusData || {}),
-          status: 'upcoming'
-        };
-        
-        // 确保数组字段存在
-        if (!mergedData.starInvestors) {
-          mergedData.starInvestors = [];
-        }
-        if (!mergedData.cornerstoneInvestors) {
-          mergedData.cornerstoneInvestors = [];
-        }
-        
-        unlisted.push(mergedData);
-      } catch (error) {
-        console.error(`[DataProvider] 处理即将上市股票 ${ipo.stockCode} 失败:`, error);
-        // 即使出错也要添加基本信息
-        unlisted.push({
-          ...ipo,
-          status: 'upcoming',
-          starInvestors: [],
-          cornerstoneInvestors: []
-        });
-      }
-    }
-
-    return unlisted;
+    return (data.subscribeIPOs || []).map(ipo => ({
+      ...ipo,
+      status: 'subscribe',
+      starInvestors: ipo.starInvestors || [],
+      cornerstoneInvestors: ipo.cornerstoneInvestors || []
+    }));
   }
 
   /**

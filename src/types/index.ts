@@ -34,10 +34,6 @@ export interface IPOStock {
   // IPO状态
   status?: IPOStatus;
   daysToListing?: number; // 距上市天数
-  // A+H股相关
-  hasAShare?: boolean; // 是否有A股
-  aShareCode?: string; // A股代码
-  aSharePrice?: number; // A股价格
   ahPremium?: number; // A/H溢价率(%)
   // 历史数据
   industryHistoryReturn?: number; // 同行业历史平均涨幅
@@ -186,4 +182,8 @@ export interface IRawIPOData {
   moatReason?: string; // 护城河评分理由(来自网络搜索)
   valuationReason?: string; // 估值评分理由(来自网络搜索)
   lastRoundValuation?: string; // 最后一轮融资估值
+  score?: number; // 后端LLM评分
+  grade?: string; // 后端LLM评级
+  strategy?: IPOStrategy; // 后端LLM策略
+  llmScoringReason?: string; // 后端LLM评分依据摘要
 }

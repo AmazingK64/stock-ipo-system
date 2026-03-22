@@ -11,12 +11,32 @@ const path = require('path');
 class WebSearchService {
   constructor() {
     // AI分析API（使用WorkBuddy内置的AI能力或外部API）
-    this.aiApiUrl = process.env.AI_API_URL || null;
-    this.aiApiKey = process.env.AI_API_KEY || null;
-    // 搜索API（使用SerpAPI或类似服务）
-    this.serpApiKey = process.env.SERP_API_KEY || null;
+    this.aiApiUrl = process.env.AI_API_URL || process.env.OPENAI_BASE_URL || null;
+    this.aiApiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || null;
+    this.aiModel = process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    this.enableLLMScoring = process.env.ENABLE_LLM_SCORING !== 'false';
+    this.tavilyApiKeys = this.parseKeyPool(process.env.TAVILY_API_KEY || process.env.TAVILY_API_KEYS);
+    this.serpApiKeys = this.parseKeyPool(process.env.SERP_API_KEY || process.env.SERPAPI_API_KEYS);
+    this.braveApiKeys = this.parseKeyPool(process.env.BRAVE_API_KEY || process.env.BRAVE_API_KEYS);
     // 缓存目录
     this.cacheDir = path.join(__dirname, '../data/search-cache');
+
+    // 修正API URL：确保包含完整的chat/completions路径
+    if (this.aiApiUrl && !this.aiApiUrl.includes('/chat/completions')) {
+      this.aiApiUrl = this.aiApiUrl.replace(/\/$/, '') + '/chat/completions';
+    }
+
+    // 调试日志：确认环境变量加载情况
+    console.log('[WebSearch] 环境变量加载情况:');
+    console.log('  - AI_API_URL:', process.env.AI_API_URL || '(未设置)');
+    console.log('  - OPENAI_BASE_URL:', process.env.OPENAI_BASE_URL || '(未设置)');
+    console.log('  - AI_API_KEY:', process.env.AI_API_KEY ? '[已设置]' : '(未设置)');
+    console.log('  - OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '[已设置]' : '(未设置)');
+    console.log('  - AI_MODEL:', process.env.AI_MODEL || '(未设置)');
+    console.log('  - OPENAI_MODEL:', process.env.OPENAI_MODEL || '(未设置)');
+    console.log('  - ENABLE_LLM_SCORING:', process.env.ENABLE_LLM_SCORING || '(未设置，默认true)');
+    console.log('  - this.aiApiUrl:', this.aiApiUrl || '(未定义)');
+    console.log('  - this.aiApiKey:', this.aiApiKey ? '[已定义]' : '(未定义)');
   }
 
   /**
@@ -116,6 +136,20 @@ class WebSearchService {
     return queries;
   }
 
+  parseKeyPool(rawValue) {
+    if (!rawValue) return [];
+    return rawValue
+      .split(',')
+      .map(key => key.trim())
+      .filter(Boolean);
+  }
+
+  pickKey(keys = []) {
+    if (!Array.isArray(keys) || keys.length === 0) return null;
+    const index = Math.floor(Math.random() * keys.length);
+    return keys[index];
+  }
+
   /**
    * 执行网络搜索
    */
@@ -126,14 +160,23 @@ class WebSearchService {
       try {
         let result = null;
 
-        // 优先使用SerpAPI
-        if (this.serpApiKey) {
-          result = await this.searchWithSerpAPI(query.query || query.fallbackQuery);
+        const finalQuery = query.query || query.fallbackQuery;
+
+        if (!result) {
+          result = await this.searchWithTavily(finalQuery);
+        }
+
+        if (!result) {
+          result = await this.searchWithSerpAPI(finalQuery);
+        }
+
+        if (!result) {
+          result = await this.searchWithBrave(finalQuery);
         }
 
         // 降级：使用免费搜索
         if (!result) {
-          result = await this.searchWithDuckDuckGo(query.query || query.fallbackQuery);
+          result = await this.searchWithDuckDuckGo(finalQuery);
         }
 
         if (result) {
@@ -154,15 +197,46 @@ class WebSearchService {
     return allResults;
   }
 
+  async searchWithTavily(query) {
+    try {
+      const apiKey = this.pickKey(this.tavilyApiKeys);
+      if (!apiKey) return null;
+
+      const response = await axios.post('https://api.tavily.com/search', {
+        api_key: apiKey,
+        query,
+        search_depth: 'basic',
+        include_answer: false,
+        max_results: 6,
+        topic: 'news'
+      }, {
+        timeout: 15000
+      });
+
+      const results = response.data?.results || [];
+      return results.slice(0, 5).map(item => ({
+        title: item.title || '',
+        snippet: item.content || item.raw_content || '',
+        url: item.url || ''
+      }));
+    } catch (error) {
+      console.warn('[WebSearch] Tavily搜索失败:', error.message);
+      return null;
+    }
+  }
+
   /**
    * 使用SerpAPI搜索
    */
   async searchWithSerpAPI(query) {
     try {
+      const apiKey = this.pickKey(this.serpApiKeys);
+      if (!apiKey) return null;
+
       const response = await axios.get('https://serpapi.com/search', {
         params: {
           q: query,
-          api_key: this.serpApiKey,
+          api_key: apiKey,
           hl: 'zh-cn',
           num: 8,
           engine: 'google'
@@ -178,6 +252,36 @@ class WebSearchService {
       }));
     } catch (error) {
       console.warn('[WebSearch] SerpAPI搜索失败:', error.message);
+      return null;
+    }
+  }
+
+  async searchWithBrave(query) {
+    try {
+      const apiKey = this.pickKey(this.braveApiKeys);
+      if (!apiKey) return null;
+
+      const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+        params: {
+          q: query,
+          count: 8,
+          freshness: 'pw'
+        },
+        headers: {
+          'X-Subscription-Token': apiKey,
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      const results = response.data?.web?.results || [];
+      return results.slice(0, 5).map(item => ({
+        title: item.title || '',
+        snippet: item.description || '',
+        url: item.url || ''
+      }));
+    } catch (error) {
+      console.warn('[WebSearch] Brave搜索失败:', error.message);
       return null;
     }
   }
@@ -240,10 +344,13 @@ class WebSearchService {
    */
   async analyzeWithAI(stockName, searchResults, basicInfo = {}) {
     // 拼接搜索结果文本
-    const searchContext = searchResults.map(group => {
-      const items = (group.results || []).map(r => `- ${r.title}: ${r.snippet}`).join('\n');
-      return `【${group.type}】\n${items}`;
-    }).join('\n\n');
+    let searchContext = '';
+    if (searchResults && searchResults.length > 0) {
+      searchContext = searchResults.map(group => {
+        const items = (group.results || []).map(r => `- ${r.title}: ${r.snippet}`).join('\n');
+        return `【${group.type}】\n${items}`;
+      }).join('\n\n');
+    }
 
     // 如果有AI API，使用AI分析
     if (this.aiApiUrl && this.aiApiKey) {
@@ -295,7 +402,7 @@ ${searchContext}
 - 亏损企业不应因此被评为poor或expensive，要看行业前景和增长潜力`;
 
       const response = await axios.post(this.aiApiUrl, {
-        model: 'gpt-4o-mini',
+        model: this.aiModel,
         messages: [
           { role: 'system', content: '你是港股IPO分析专家，只返回JSON格式结果，不要加markdown代码块标记。' },
           { role: 'user', content: prompt }
@@ -496,6 +603,229 @@ ${searchContext}
     const now = new Date();
     const diffHours = (now - cacheTime) / (1000 * 60 * 60);
     return diffHours < 24; // 缓存24小时有效
+  }
+
+  buildScoringFallback(ipoData = {}) {
+    let score = 55;
+
+    if (ipoData.businessModel === 'excellent') score += 10;
+    if (ipoData.businessModel === 'good') score += 6;
+    if (ipoData.businessModel === 'fair') score += 2;
+    if (ipoData.businessModel === 'poor') score -= 6;
+
+    if (ipoData.moatLevel === 'wide') score += 8;
+    if (ipoData.moatLevel === 'moderate') score += 5;
+    if (ipoData.moatLevel === 'narrow') score += 1;
+    if (ipoData.moatLevel === 'none') score -= 4;
+
+    if (ipoData.valuationLevel === 'cheap') score += 9;
+    if (ipoData.valuationLevel === 'fair') score += 4;
+    if (ipoData.valuationLevel === 'premium') score -= 3;
+    if (ipoData.valuationLevel === 'expensive') score -= 8;
+
+    if (ipoData.cornerstone) score += 4;
+    if ((ipoData.starInvestors || []).length >= 2) score += 4;
+    if (typeof ipoData.marginMultiple === 'number' && ipoData.marginMultiple >= 15) score += 6;
+    if (typeof ipoData.marginMultiple === 'number' && ipoData.marginMultiple >= 5 && ipoData.marginMultiple < 15) score += 3;
+    if (ipoData.profitability === 'loss') score -= 4;
+    if (ipoData.profitability === 'profitable') score += 3;
+    if ((ipoData.revenueGrowth || 0) > 0.5) score += 3;
+
+    score = Math.max(20, Math.min(95, Math.round(score)));
+
+    let grade = 'B';
+    if (score >= 90) grade = 'A+';
+    else if (score >= 85) grade = 'A';
+    else if (score >= 80) grade = 'A-';
+    else if (score >= 75) grade = 'B+';
+    else if (score >= 65) grade = 'B';
+    else if (score >= 55) grade = 'B-';
+    else if (score >= 45) grade = 'C+';
+    else if (score >= 35) grade = 'C';
+    else grade = 'D';
+
+    return {
+      score,
+      grade,
+      strategy: {
+        recommendation: score >= 80 ? '可重点参与' : score >= 65 ? '谨慎参与' : '观望为主',
+        action: score >= 80 ? '现金+适度融资申购' : score >= 65 ? '小仓位现金申购' : '暂不申购',
+        riskLevel: score >= 80 ? '中' : score >= 65 ? '中高' : '高',
+        expectedReturn: score >= 80 ? '中高' : score >= 65 ? '中' : '低'
+      },
+      llmScoringReason: '基于基础数据的量化评分，暂无AI分析'
+    };
+  }
+
+  normalizeScoringResult(rawResult, ipoData = {}) {
+    if (!rawResult || typeof rawResult !== 'object') return null;
+    if (typeof rawResult.score !== 'number' || Number.isNaN(rawResult.score)) return null;
+    if (rawResult.score < 0 || rawResult.score > 100) return null;
+
+    const fallback = this.buildScoringFallback(ipoData);
+    const normalizedGrade = typeof rawResult.grade === 'string' && rawResult.grade.trim()
+      ? rawResult.grade.trim()
+      : fallback.grade;
+    const strategy = rawResult.strategy && typeof rawResult.strategy === 'object'
+      ? rawResult.strategy
+      : fallback.strategy;
+
+    const result = {
+      score: Math.round(rawResult.score),
+      grade: normalizedGrade,
+      strategy: {
+        recommendation: strategy.recommendation || fallback.strategy.recommendation,
+        action: strategy.action || fallback.strategy.action,
+        riskLevel: strategy.riskLevel || fallback.strategy.riskLevel,
+        expectedReturn: strategy.expectedReturn || fallback.strategy.expectedReturn
+      },
+      llmScoringReason: typeof rawResult.reasoning === 'string' ? rawResult.reasoning : ''
+    };
+    console.log('[WebSearch] normalizeScoringResult: score=', result.score, 'grade=', result.grade, 'reasoning=', result.llmScoringReason?.substring(0, 50));
+    return result;
+  }
+
+  async scoreIPOWithAI(ipoData = {}) {
+    if (!this.enableLLMScoring || !this.aiApiUrl || !this.aiApiKey) {
+      console.warn('[WebSearch] LLM评分跳过: enableLLMScoring=', this.enableLLMScoring, 'aiApiUrl=', !!this.aiApiUrl, 'aiApiKey=', !!this.aiApiKey);
+      return this.buildScoringFallback(ipoData);
+    }
+
+    console.log(`[WebSearch] 调用LLM评分: ${ipoData.stockCode} ${ipoData.stockName}, URL=${this.aiApiUrl}, Model=${this.aiModel}`);
+
+    try {
+      const prompt = `你是一位港股IPO打新评分专家。请仅输出JSON，不要输出其他文本。
+
+请根据以下公司数据，输出打新评分（0-100）和申购策略：
+${JSON.stringify({
+  stockCode: ipoData.stockCode,
+  stockName: ipoData.stockName,
+  industry: ipoData.industry,
+  listingDate: ipoData.listingDate,
+  subscriptionEndDate: ipoData.subscriptionEndDate,
+  issuePrice: ipoData.issuePrice,
+  marketCap: ipoData.marketCap,
+  peRatio: ipoData.peRatio,
+  pbRatio: ipoData.pbRatio,
+  profitability: ipoData.profitability,
+  revenue: ipoData.revenue,
+  netProfit: ipoData.netProfit,
+  revenueGrowth: ipoData.revenueGrowth,
+  profitGrowth: ipoData.profitGrowth,
+  underwriter: ipoData.underwriter,
+  cornerstone: ipoData.cornerstone,
+  starInvestors: ipoData.starInvestors,
+  marginMultiple: ipoData.marginMultiple,
+  publicSharesRatio: ipoData.publicSharesRatio,
+  businessModel: ipoData.businessModel,
+  moatLevel: ipoData.moatLevel,
+  valuationLevel: ipoData.valuationLevel,
+  businessModelReason: ipoData.businessModelReason,
+  moatReason: ipoData.moatReason,
+  valuationReason: ipoData.valuationReason,
+  ahDiscount: ipoData.ahDiscount
+}, null, 2)}
+
+JSON格式如下：
+{
+  "score": 0-100之间数字,
+  "grade": "A+|A|A-|B+|B|B-|C+|C|D",
+  "reasoning": "一句话说明评分核心依据",
+  "strategy": {
+    "recommendation": "总体建议",
+    "action": "具体操作",
+    "riskLevel": "低|中|中高|高",
+    "expectedReturn": "低|中|中高|高"
+  }
+}`;
+
+      const response = await axios.post(this.aiApiUrl, {
+        model: this.aiModel,
+        messages: [
+          { role: 'system', content: '你是港股IPO策略专家，只返回JSON格式结果，不要使用markdown。' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 900
+      }, {
+        headers: {
+          'Authorization': `Bearer ${this.aiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 20000  // 20秒超时
+      });
+
+      const content = response.data?.choices?.[0]?.message?.content || '';
+      console.log('[WebSearch] LLM响应内容:', content.substring(0, 300));
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.warn('[WebSearch] 未找到JSON内容');
+        return this.buildScoringFallback(ipoData);
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('[WebSearch] 解析结果:', JSON.stringify(parsed).substring(0, 200));
+      return this.normalizeScoringResult(parsed, ipoData) || this.buildScoringFallback(ipoData);
+    } catch (error) {
+      console.warn('[WebSearch] LLM评分失败，使用降级评分:', error.message);
+      if (error.response) {
+        console.warn('[WebSearch] API响应状态:', error.response.status);
+        console.warn('[WebSearch] API响应数据:', JSON.stringify(error.response.data).substring(0, 200));
+      } else if (error.request) {
+        console.warn('[WebSearch] 请求已发送但没有收到响应');
+      }
+      return this.buildScoringFallback(ipoData);
+    }
+  }
+
+  async enrichAndScoreSubscribeIPOs(ipoList) {
+    if (!Array.isArray(ipoList) || ipoList.length === 0) return ipoList;
+
+    const now = new Date();
+    const results = [];
+
+    for (const ipo of ipoList) {
+      const isSubscribe = ipo?.status === 'subscribe';
+      const endDate = ipo?.subscriptionEndDate ? new Date(ipo.subscriptionEndDate) : null;
+      const isActive = !endDate || endDate > now;
+
+      console.log(`[WebSearch] 处理IPO: ${ipo.stockCode} ${ipo.stockName}, status=${ipo.status}, isSubscribe=${isSubscribe}, isActive=${isActive}`);
+
+      if (!isSubscribe || !isActive) {
+        results.push(ipo);
+        continue;
+      }
+
+      let merged = { ...ipo };
+
+      // 强制调用LLM评分，添加错误处理确保不会阻塞
+      try {
+        const scoreResult = await this.scoreIPOWithAI(merged);
+        console.log(`[WebSearch] LLM评分完成: ${scoreResult.score}分, ${scoreResult.grade}级, 原因: ${scoreResult.llmScoringReason?.substring(0, 50)}...`);
+        results.push({
+          ...merged,
+          score: scoreResult.score,
+          grade: scoreResult.grade,
+          strategy: scoreResult.strategy,
+          llmScoringReason: scoreResult.llmScoringReason || merged.llmScoringReason
+        });
+      } catch (err) {
+        console.warn(`[WebSearch] 评分失败，使用基础评分:`, err.message);
+        const fallback = this.buildScoringFallback(merged);
+        results.push({
+          ...merged,
+          score: fallback.score,
+          grade: fallback.grade,
+          strategy: fallback.strategy,
+          llmScoringReason: '评分系统暂时不可用'
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    console.log('[WebSearch] 全部IPO处理完成，共:', results.length);
+    return results;
   }
 
   /**

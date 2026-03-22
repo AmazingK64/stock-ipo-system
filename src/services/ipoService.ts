@@ -106,7 +106,7 @@ class IPOService {
   private async fetchFromBackend(): Promise<IRawIPOData[]> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时（LLM评分需要较长时间）
 
       const response = await fetch(`${this.apiBaseURL}/ipo-list`, {
         signal: controller.signal,
@@ -182,7 +182,11 @@ class IPOService {
       businessModelReason: item.businessModelReason,
       moatReason: item.moatReason,
       valuationReason: item.valuationReason,
-      lastRoundValuation: item.lastRoundValuation
+      lastRoundValuation: item.lastRoundValuation,
+      score: item.score,
+      grade: item.grade,
+      strategy: item.strategy,
+      llmScoringReason: item.llmScoringReason
     }));
   }
 
@@ -510,9 +514,9 @@ class IPOService {
       
       // 再保存新数据
       for (const ipo of ipoList) {
-        const score = this.calculateIPOScore(ipo);
-        const grade = this.getGrade(score);
-        const strategy = this.generateStrategy(score, grade);
+        const score = typeof ipo.score === 'number' ? ipo.score : this.calculateIPOScore(ipo);
+        const grade = ipo.grade || this.getGrade(score);
+        const strategy = ipo.strategy || this.generateStrategy(score, grade);
 
         await db.ipoStocks.add({
           ...ipo,
