@@ -20,6 +20,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const etnetScraper = require('./scraper/etnet-scraper-fixed');
 const aastocksScraper = require('./scraper/aastocks-scraper');
+const aipoScraper = require('./scraper/aipo-scraper');
 const dataProvider = require('./dataProvider');
 const prospectusDownloader = require('./scraper/hkex-prospectus-downloader');
 const webSearchService = require('./scraper/web-search-service');
@@ -162,7 +163,7 @@ app.get('/api/ipo-list', async (req, res) => {
 // 获取申购中的IPO数据（仅subscribe状态）
 // 供实时孖展数据组件使用，只返回正在招股的股票
 app.get('/api/subscribe-list', async (req, res) => {
-  const timeout = 15000;
+  const timeout = 30000;
   try {
     console.log('[API] 获取申购中的IPO列表(仅subscribe)...');
 
@@ -182,14 +183,15 @@ app.get('/api/subscribe-list', async (req, res) => {
 
       console.log(`[API] 申购中数据: ${staticData.subscribeIPOs.length} -> ${activeSubscriptions.length} 条`);
 
-      // 尝试获取孖展数据并合并
+      // 从 AiPO 数据网获取实时孖展数据
       let mergedWithMargin = activeSubscriptions;
       try {
+        console.log('[API] 从 AiPO 数据网获取孖展数据...');
         const marginData = await Promise.race([
-          aastocksScraper.scrapeMarginData(),
+          aipoScraper.scrapeMarginData(),
           new Promise((_, reject) => setTimeout(() => reject(new Error('孖展数据超时')), timeout))
         ]).catch(err => {
-          console.warn('[API] 孖展数据获取失败:', err.message);
+          console.warn('[API] AiPO孖展数据获取失败:', err.message);
           return [];
         });
 
@@ -209,7 +211,7 @@ app.get('/api/subscribe-list', async (req, res) => {
             return ipo;
           });
 
-          console.log(`[API] 孖展数据合并: ${marginData.length} 条匹配`);
+          console.log(`[API] AiPO孖展数据合并: ${marginData.length} 条`);
         }
       } catch (err) {
         console.warn('[API] 孖展数据合并失败:', err.message);

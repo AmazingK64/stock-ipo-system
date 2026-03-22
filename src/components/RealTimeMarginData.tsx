@@ -3,7 +3,6 @@ import { Card, Table, Tag, Space, Typography, Alert, Statistic, Row, Col, Empty,
 import { 
   FireOutlined, 
   ThunderboltOutlined, 
-  SyncOutlined,
   InfoCircleOutlined,
   RiseOutlined,
   WarningOutlined,
@@ -21,8 +20,9 @@ interface MarginData {
   subscriptionEndDate: string;
   listingDate: string;
   issuePrice: string;
-  score?: number;
-  grade?: string;
+  marketCap?: string;
+  offeringShares?: number;
+  sharesPerLot?: number;
 }
 
 const RealTimeMarginData: React.FC = () => {
@@ -32,13 +32,52 @@ const RealTimeMarginData: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [hasLoaded, setHasLoaded] = useState(false);
 
+  const parseMarketCap = (marketCap: string | undefined): number | null => {
+    if (!marketCap) return null;
+    const match = marketCap.match(/([\d.]+)/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+    return null;
+  };
+
+  const parseIssuePrice = (issuePrice: string | undefined): number | null => {
+    if (!issuePrice) return null;
+    const match = issuePrice.match(/([\d.]+)/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+    return null;
+  };
+
+  const calculateMarginAmount = (ipo: MarginData): number | null => {
+    if (!ipo.marginMultiple || ipo.marginMultiple <= 0) return null;
+
+    // 方法1: 使用 marketCap（IPO发售金额/集资规模）
+    const marketCapValue = parseMarketCap(ipo.marketCap);
+    if (marketCapValue && marketCapValue > 0) {
+      return ipo.marginMultiple * marketCapValue;
+    }
+
+    // 方法2: 使用 offeringShares × issuePrice
+    if (ipo.offeringShares && ipo.offeringShares > 0) {
+      const price = parseIssuePrice(ipo.issuePrice);
+      if (price && price > 0) {
+        const publicOfferAmount = (ipo.offeringShares * price) / 100000000; // 转换为亿
+        return ipo.marginMultiple * publicOfferAmount;
+      }
+    }
+
+    return null;
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
       const response = await fetch('http://localhost:3001/api/subscribe-list', {
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(60000)
       });
       
       if (!response.ok) {
@@ -54,18 +93,31 @@ const RealTimeMarginData: React.FC = () => {
             if (!ipo.subscriptionEndDate) return true;
             return new Date(ipo.subscriptionEndDate) >= now;
           })
-          .map((ipo: any) => ({
-            stockCode: ipo.stockCode,
-            stockName: ipo.stockName,
-            industry: ipo.industry || '',
-            marginMultiple: ipo.marginMultiple,
-            marginAmount: ipo.marginAmount,
-            subscriptionEndDate: ipo.subscriptionEndDate,
-            listingDate: ipo.listingDate,
-            issuePrice: ipo.issuePrice,
-            score: ipo.score,
-            grade: ipo.grade
-          }));
+          .map((ipo: any) => {
+            const marginData: MarginData = {
+              stockCode: ipo.stockCode,
+              stockName: ipo.stockName,
+              industry: ipo.industry || '',
+              marginMultiple: ipo.marginMultiple,
+              marginAmount: ipo.marginAmount,
+              subscriptionEndDate: ipo.subscriptionEndDate,
+              listingDate: ipo.listingDate,
+              issuePrice: ipo.issuePrice,
+              marketCap: ipo.marketCap,
+              offeringShares: ipo.offeringShares,
+              sharesPerLot: ipo.sharesPerLot
+            };
+
+            // 如果没有孖展金额，根据孖展倍数和招股书数据计算
+            if (!marginData.marginAmount && marginData.marginMultiple) {
+              const calculated = calculateMarginAmount(marginData);
+              if (calculated) {
+                marginData.marginAmount = calculated;
+              }
+            }
+
+            return marginData;
+          });
         
         setData(activeData);
         setLastUpdate(new Date().toLocaleString('zh-CN'));
@@ -95,15 +147,6 @@ const RealTimeMarginData: React.FC = () => {
     return <Tag color="#1890ff">冷门</Tag>;
   };
 
-  const getGradeColor = (grade: string) => {
-    const colors: Record<string, string> = {
-      'A+': '#ff4d4f', 'A': '#ff7a45', 'A-': '#fa8c16',
-      'B+': '#faad14', 'B': '#52c41a', 'B-': '#73d13d',
-      'C+': '#1890ff', 'C': '#69c0ff', 'D': '#8c8c8c'
-    };
-    return colors[grade] || '#8c8c8c';
-  };
-
   const columns = [
     {
       title: '股票代码',
@@ -122,26 +165,16 @@ const RealTimeMarginData: React.FC = () => {
       title: '行业',
       dataIndex: 'industry',
       key: 'industry',
-      width: 120,
+      width: 100,
       ellipsis: true,
-    },
-    {
-      title: '评分',
-      dataIndex: 'grade',
-      key: 'grade',
-      width: 80,
-      render: (grade: string, record: MarginData) => (
-        <Tag color={getGradeColor(grade)} style={{ fontWeight: 'bold' }}>
-          {grade || '-'} {record.score ? `(${record.score})` : ''}
-        </Tag>
-      )
     },
     {
       title: '孖展倍数',
       dataIndex: 'marginMultiple',
       key: 'marginMultiple',
-      width: 100,
+      width: 120,
       sorter: (a: MarginData, b: MarginData) => (a.marginMultiple || 0) - (b.marginMultiple || 0),
+      defaultSortOrder: 'descend' as const,
       render: (value: number) => {
         if (!value) return <Text type="secondary">暂无</Text>;
         const color = value > 100 ? '#ff4d4f' : value > 50 ? '#fa8c16' : '#52c41a';
@@ -157,8 +190,22 @@ const RealTimeMarginData: React.FC = () => {
       title: '孖展金额',
       dataIndex: 'marginAmount',
       key: 'marginAmount',
-      width: 90,
-      render: (value: number) => value ? <Text>{value.toFixed(1)}亿</Text> : <Text type="secondary">-</Text>
+      width: 100,
+      sorter: (a: MarginData, b: MarginData) => (a.marginAmount || 0) - (b.marginAmount || 0),
+      render: (value: number) => {
+        if (!value) return <Text type="secondary">-</Text>;
+        if (value >= 100) {
+          return <Text strong style={{ color: '#ff4d4f' }}>{value.toFixed(1)}亿</Text>;
+        }
+        return <Text>{value.toFixed(1)}亿</Text>;
+      }
+    },
+    {
+      title: '集资规模',
+      dataIndex: 'marketCap',
+      key: 'marketCap',
+      width: 100,
+      render: (value: string) => <Text type="secondary">{value || '-'}</Text>
     },
     {
       title: '申购截止',
@@ -300,7 +347,8 @@ const RealTimeMarginData: React.FC = () => {
             description={
               <Space direction="vertical" size={0}>
                 <Text>• 孖展倍数: 融资认购金额 / 公开发售金额，反映市场申购热度</Text>
-                <Text>• 评分由AI根据行业赛道、基本面、估值等多维度综合评估</Text>
+                <Text>• 孖展金额 = 孖展倍数 × 集资规模（根据招股书数据计算）</Text>
+                <Text>• 数据来源: AiPO数据网 (aipo.myiqdii.com)</Text>
                 <Text type="warning">⚠️ 数据仅供参考，投资需谨慎</Text>
               </Space>
             }
