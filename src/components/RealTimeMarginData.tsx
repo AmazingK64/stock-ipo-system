@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Tag, Space, Typography, Alert, Progress, Statistic, Row, Col, Empty, Spin } from 'antd';
+import React, { useState } from 'react';
+import { Card, Table, Tag, Space, Typography, Alert, Statistic, Row, Col, Empty, Spin, Button, message } from 'antd';
 import { 
   FireOutlined, 
   ThunderboltOutlined, 
   SyncOutlined,
   InfoCircleOutlined,
-  UserOutlined,
   RiseOutlined,
-  WarningOutlined
+  WarningOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
-import ipoService from '../services/ipoService';
-import type { IPOStock } from '../types';
 
 const { Text, Title } = Typography;
 
@@ -32,6 +30,7 @@ const RealTimeMarginData: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -39,7 +38,7 @@ const RealTimeMarginData: React.FC = () => {
     try {
       const response = await fetch('http://localhost:3001/api/subscribe-list', {
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(30000)
       });
       
       if (!response.ok) {
@@ -70,20 +69,23 @@ const RealTimeMarginData: React.FC = () => {
         
         setData(activeData);
         setLastUpdate(new Date().toLocaleString('zh-CN'));
+        setHasLoaded(true);
+        message.success(`获取到 ${activeData.length} 条申购数据`);
       } else {
         throw new Error('数据为空');
       }
     } catch (error: any) {
       console.error('加载实时数据失败:', error);
       setError(error.message || '获取数据失败');
+      message.error('获取数据失败: ' + (error.message || '未知错误'));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  const handleRefresh = () => {
     loadData();
-  }, []);
+  };
 
   const getHeatTag = (marginMultiple: number) => {
     if (marginMultiple > 100) return <Tag color="#ff4d4f" icon={<FireOutlined />}>超热门</Tag>;
@@ -196,15 +198,19 @@ const RealTimeMarginData: React.FC = () => {
           <Space>
             <ThunderboltOutlined style={{ color: '#1890ff', fontSize: 20 }} />
             <Title level={4} style={{ margin: 0 }}>实时孖展数据</Title>
-            <Tag color="blue">申购中: {data.length}只</Tag>
+            {data.length > 0 && <Tag color="blue">申购中: {data.length}只</Tag>}
           </Space>
           <Space>
             {lastUpdate && <Text type="secondary" style={{ fontSize: 12 }}>更新: {lastUpdate}</Text>}
-            <SyncOutlined 
-              spin={loading} 
-              onClick={loadData}
-              style={{ cursor: 'pointer', color: '#1890ff', fontSize: 16 }}
-            />
+            <Button 
+              type="primary"
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={handleRefresh}
+              loading={loading}
+              size="small"
+            >
+              {loading ? '获取中...' : '刷新数据'}
+            </Button>
           </Space>
         </Space>
       }
@@ -226,6 +232,15 @@ const RealTimeMarginData: React.FC = () => {
           <Spin size="large" />
           <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>正在获取实时数据...</Text>
         </div>
+      ) : !hasLoaded ? (
+        <Empty 
+          description="点击右上角「刷新数据」按钮获取实时孖展数据" 
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        >
+          <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
+            刷新数据
+          </Button>
+        </Empty>
       ) : data.length === 0 ? (
         <Empty description="暂无申购中的新股" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
