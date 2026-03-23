@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Typography, Button, message, Space, ConfigProvider, Popconfirm, Tooltip, Switch, Modal } from 'antd';
-import { ReloadOutlined, DeleteOutlined, FileTextOutlined, SettingOutlined } from '@ant-design/icons';
+import { Layout, Typography, Button, message, Space, ConfigProvider, Tooltip, Switch, Modal } from 'antd';
+import { ReloadOutlined, FileTextOutlined, SettingOutlined } from '@ant-design/icons';
 import CapitalManagement from './components/CapitalManagement';
 import IPOList from './components/IPOList';
 import StrategyPlans from './components/StrategyPlans';
@@ -100,18 +100,6 @@ const App: React.FC = () => {
     setUpdatingProspectus(false);
   };
 
-  const clearAndReload = async () => {
-    try {
-      // 清空数据库
-      await db.ipoStocks.clear();
-      message.success('数据库已清空,正在重新加载...');
-      // 重新加载数据
-      await refreshIPOData();
-    } catch (error) {
-      message.error('清空失败');
-    }
-  };
-
   const handleCapitalUpdate = (amount: number) => {
     setCapital(amount);
   };
@@ -152,25 +140,6 @@ const App: React.FC = () => {
             >
               设置
             </Button>
-            <Popconfirm
-              title="清空数据库"
-              description="确定要清空所有新股数据并重新加载吗?"
-              onConfirm={clearAndReload}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button
-                type="primary"
-                icon={<DeleteOutlined />}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  fontWeight: 'bold'
-                }}
-              >
-                清除重复
-              </Button>
-            </Popconfirm>
             <Button
               type="primary"
               icon={<ReloadOutlined />}

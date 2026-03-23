@@ -8,6 +8,7 @@ import {
   QuestionCircleOutlined
 } from '@ant-design/icons';
 import type { IPOStock } from '../types';
+import strategyService from '../services/strategyService';
 
 const { Text, Title } = Typography;
 
@@ -27,9 +28,10 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
   };
 
   const estimateWinRate = (
-    marginMultiple: number | undefined, 
+    marginMultiple: number | undefined,
     publicSharesRatio: number | undefined,
-    is18C: boolean = false
+    is18C: boolean = false,
+    ipo?: IPOStock
   ): {
     rate: number;
     level: string;
@@ -37,11 +39,54 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
     description: string;
   } => {
     if (!marginMultiple || marginMultiple <= 0) {
+      // marginMultiple 不可用时，尝试用 IPO 完整数据估算中签率
+      if (ipo) {
+        const issuePrice = parseFloat(ipo.issuePrice);
+        const sharesPerLot = ipo.sharesPerLot || 100;
+        const marketCapStr = ipo.marketCap;
+        const marketCapMatch = marketCapStr ? marketCapStr.match(/([\d.]+)/) : null;
+        const marketCapValue = marketCapMatch ? parseFloat(marketCapMatch[1]) * 100000000 : 0;
+
+        // 使用 strategyService 估算（默认申购金额 10 万港币，1倍融资）
+        const defaultSubscription = 100000;
+        const winRateResult = strategyService.estimateWinRate(ipo, defaultSubscription, 1);
+
+        if (winRateResult.winRate > 0) {
+          const levelMap: Record<string, { level: string; color: string }> = {
+            '极低': { level: '极低', color: '#ff4d4f' },
+            '较低': { level: '较低', color: '#fa8c16' },
+            '中等': { level: '中等', color: '#faad14' },
+            '较高': { level: '较高', color: '#52c41a' },
+            '高': { level: '高', color: '#1890ff' },
+            '很高': { level: '很高', color: '#722ed1' }
+          };
+
+          // 根据甲组/乙组和一手中签率推断等级
+          let level = '中等';
+          let color = '#faad14';
+          const oneHandRate = winRateResult.oneHandWinRate * 100;
+
+          if (oneHandRate >= 30) { level = '很高'; color = '#722ed1'; }
+          else if (oneHandRate >= 15) { level = '高'; color = '#1890ff'; }
+          else if (oneHandRate >= 8) { level = '较高'; color = '#52c41a'; }
+          else if (oneHandRate >= 3) { level = '中等'; color = '#faad14'; }
+          else if (oneHandRate >= 1) { level = '较低'; color = '#fa8c16'; }
+          else { level = '极低'; color = '#ff4d4f'; }
+
+          return {
+            rate: winRateResult.winRate * 100,
+            level,
+            color,
+            description: `${winRateResult.groupType}，一手中签率约${oneHandRate.toFixed(2)}%，基于招股数据估算（无孖展数据）`
+          };
+        }
+      }
+
       return {
         rate: 0,
-        level: '未知',
+        level: '暂无孖展数据',
         color: '#8c8c8c',
-        description: '暂无孖展数据'
+        description: '暂无孖展数据，无法估算'
       };
     }
 
@@ -234,7 +279,7 @@ const StrategyPlans: React.FC<StrategyPlansProps> = ({ capital, ipoStocks }) => 
           <Divider style={{ margin: '16px 0' }}>推荐申购 (按评分排序)</Divider>
           <Row gutter={[16, 16]}>
             {recommendedStocks.map((ipo, index) => {
-              const winRateInfo = estimateWinRate(ipo.marginMultiple, ipo.publicSharesRatio, ipo.is18C);
+              const winRateInfo = estimateWinRate(ipo.marginMultiple, ipo.publicSharesRatio, ipo.is18C, ipo);
               
               return (
                 <Col xs={24} sm={12} md={8} lg={recommendedStocks.length <= 3 ? 8 : 6} key={ipo.stockCode}>

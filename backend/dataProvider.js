@@ -24,7 +24,7 @@ class DataProvider {
   }
 
   /**
-   * 加载静态数据文件
+   * 加载静态数据文件（每次都重新读取，不使用缓存）
    */
   loadStaticData() {
     try {
@@ -45,19 +45,18 @@ class DataProvider {
 
   /**
    * 获取完整IPO数据（整合多个数据源）
+   * 每次都重新读取静态文件，确保获取最新数据
    */
   async getAllData() {
-    // 1. 首先尝试加载静态数据
-    if (!this.staticData) {
-      this.loadStaticData();
-    }
+    // 每次都重新加载静态数据文件
+    this.loadStaticData();
 
-    // 2. 如果有静态数据，直接返回
+    // 如果有静态数据，返回它
     if (this.staticData) {
       return this.staticData;
     }
 
-    // 3. 降级：返回空数据
+    // 降级：返回空数据
     return {
       subscribeIPOs: [],
       upcomingIPOs: [],

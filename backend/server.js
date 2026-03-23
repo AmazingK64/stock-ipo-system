@@ -97,27 +97,40 @@ app.get('/api/ipo-list', async (req, res) => {
     if (unlistedIPOs && unlistedIPOs.length > 0) {
       console.log(`[API] 静态数据: ${unlistedIPOs.length} 条`);
 
-      let resultData;
-      try {
-        console.log('[API] 开始LLM评分...');
-        resultData = await webSearchService.enrichAndScoreSubscribeIPOs(unlistedIPOs);
-        console.log('[API] LLM评分完成');
-      } catch (err) {
-        console.warn('[API] LLM评分失败，使用原始数据:', err.message);
-        resultData = unlistedIPOs;
-      }
-
-      console.log('[API] 准备返回数据，长度:', resultData.length);
-      return res.json({
-        success: true,
-        data: resultData,
-        lastUpdate: new Date().toISOString(),
-        cached: false,
-        source: 'static'
+      // 检查静态数据是否仍然有效（是否有仍在申购期内的股票）
+      const now = new Date();
+      const hasActiveSubscriptions = unlistedIPOs.some(ipo => {
+        if (!ipo.subscriptionEndDate) return false;
+        return new Date(ipo.subscriptionEndDate) >= now;
       });
+
+      // 如果所有股票的申购都已截止，说明静态数据已过期，跳过静态数据
+      if (!hasActiveSubscriptions) {
+        console.log('[API] 静态数据中所有股票申购均已截止，数据已过期，强制使用爬虫获取新数据');
+      } else {
+        // 静态数据有效，使用它
+        let resultData;
+        try {
+          console.log('[API] 开始LLM评分...');
+          resultData = await webSearchService.enrichAndScoreSubscribeIPOs(unlistedIPOs);
+          console.log('[API] LLM评分完成');
+        } catch (err) {
+          console.warn('[API] LLM评分失败，使用原始数据:', err.message);
+          resultData = unlistedIPOs;
+        }
+
+        console.log('[API] 准备返回数据，长度:', resultData.length);
+        return res.json({
+          success: true,
+          data: resultData,
+          lastUpdate: new Date().toISOString(),
+          cached: false,
+          source: 'static'
+        });
+      }
     }
 
-    // 如果静态数据为空，尝试爬虫
+    // 如果静态数据为空或已过期，尝试爬虫
     console.log('[API] 静态数据为空，使用爬虫数据...');
     const { now, today } = getCurrentDateInfo();
 
@@ -170,63 +183,7 @@ app.get('/api/subscribe-list', async (req, res) => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
-    // 优先使用静态数据
-    const staticData = await dataProvider.getAllData();
-
-    if (staticData && staticData.subscribeIPOs?.length > 0) {
-      // 根据当前时间再次过滤，确保只返回真正在申购中的
-      const activeSubscriptions = staticData.subscribeIPOs.filter(ipo => {
-        if (!ipo.subscriptionEndDate) return true; // 没有截止日期的保留
-        const endDate = new Date(ipo.subscriptionEndDate);
-        return endDate >= now;
-      });
-
-      console.log(`[API] 申购中数据: ${staticData.subscribeIPOs.length} -> ${activeSubscriptions.length} 条`);
-
-      // 从 AiPO 数据网获取实时孖展数据
-      let mergedWithMargin = activeSubscriptions;
-      try {
-        console.log('[API] 从 AiPO 数据网获取孖展数据...');
-        const marginData = await Promise.race([
-          aipoScraper.scrapeMarginData(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('孖展数据超时')), timeout))
-        ]).catch(err => {
-          console.warn('[API] AiPO孖展数据获取失败:', err.message);
-          return [];
-        });
-
-        if (marginData && marginData.length > 0) {
-          const marginMap = new Map();
-          marginData.forEach(m => marginMap.set(m.stockCode, m));
-
-          mergedWithMargin = activeSubscriptions.map(ipo => {
-            const margin = marginMap.get(ipo.stockCode);
-            if (margin) {
-              return {
-                ...ipo,
-                marginMultiple: margin.marginMultiple,
-                marginAmount: margin.marginAmount
-              };
-            }
-            return ipo;
-          });
-
-          console.log(`[API] AiPO孖展数据合并: ${marginData.length} 条`);
-        }
-      } catch (err) {
-        console.warn('[API] 孖展数据合并失败:', err.message);
-      }
-
-      return res.json({
-        success: true,
-        data: mergedWithMargin,
-        lastUpdate: new Date().toISOString(),
-        source: 'static'
-      });
-    }
-
-    // 降级：爬虫数据
-    console.log('[API] 静态数据为空，尝试爬虫数据...');
+    // 从爬虫获取实时数据
     const [etnetData, aastocksData] = await Promise.all([
       Promise.race([
         etnetScraper.scrapeAll(),
@@ -245,12 +202,44 @@ app.get('/api/subscribe-list', async (req, res) => {
       })
     ]);
 
-    const mergedData = mergeAndFilterIPOData(etnetData, aastocksData, null, now, today);
+    let mergedData = mergeAndFilterIPOData(etnetData, aastocksData, null, now, today);
+
+    // 尝试用静态数据补充（覆盖孖展数据）
+    const staticData = await dataProvider.getAllData();
+    if (staticData && staticData.subscribeIPOs?.length > 0) {
+      // 检查爬虫数据是否为空或过期
+      const scrapedActive = mergedData.filter(ipo => ipo.status === 'subscribe');
+      const staticActive = staticData.subscribeIPOs.filter(ipo => {
+        if (!ipo.subscriptionEndDate) return true;
+        return new Date(ipo.subscriptionEndDate) >= now;
+      });
+
+      // 如果爬虫数据少，用静态数据补充孖展字段
+      if (scrapedActive.length === 0 && staticActive.length > 0) {
+        console.log('[API] 爬虫无数据，用静态数据补充（仅作孖展字段）');
+        mergedData = staticActive.map(ipo => ({ ...ipo, status: 'subscribe' }));
+      } else if (scrapedActive.length > 0) {
+        // 爬虫有数据，用静态孖展数据补充
+        const marginMap = new Map();
+        (staticData.subscribeIPOs || []).forEach(ipo => {
+          if (ipo.marginMultiple) {
+            marginMap.set(ipo.stockCode, ipo);
+          }
+        });
+        mergedData = mergedData.map(ipo => {
+          const staticIpo = marginMap.get(ipo.stockCode);
+          if (staticIpo && staticIpo.marginMultiple) {
+            return { ...ipo, marginMultiple: staticIpo.marginMultiple, marginAmount: staticIpo.marginAmount };
+          }
+          return ipo;
+        });
+      }
+    }
 
     // 只返回subscribe状态的
     const subscribeData = mergedData.filter(ipo => ipo.status === 'subscribe');
 
-    console.log(`[API] 申购中数据(爬虫): 共 ${subscribeData.length} 条`);
+    console.log(`[API] 申购中数据: 共 ${subscribeData.length} 条`);
 
     res.json({
       success: true,

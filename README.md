@@ -32,43 +32,54 @@
   - 一手中签率实时估算
   - 申购人数统计
 
-- **🧠 智能策略推荐**
-  - 基于多维度的IPO评分系统
-  - 自动生成Top3最优策略方案
-  - 考虑融资倍数的中签率计算
-  - 智能资金分配建议
+- **🧠 AI深度分析工作流**
+  - 5个AI角色分工协作（基本面分析师、市场分析师、招股书专家、策略分析师、结论复盘师）
+  - 基于真实招股书和网络信息的多维度分析
+  - 商业模式、护城河、估值水平深度解读
+  - 募资用途分析和风险提示
+  - 综合投资建议和预期收益
 
-- **💰 成本收益分析**
-  - 机会成本计算(资金锁定利息)
+- **⭐ 智能评分系统（100分制）**
+  - 行业热度（35分）：AI/半导体等风口行业加分
+  - 保荐人（20分）：中金/摩根等第一梯队保荐人加分
+  - 投资者背景（16分）：基石投资者和知名机构加分
+  - 商业模式（10分）：护城河深度评估
+  - 估值水平（10分）：PE/PB对比同行
+  - 绿鞋机制（5分）：有无超额配售权
+  - AH折价（2分）：A+H股折价安全垫
+  - 盈利能力（2分）：盈利/亏损企业差异化评分
+  - 评分等级：A+(≥80) / A(72-79) / A-(65-71) / B+(58-64) / B(48-57) / B-(38-47) / C+(28-37) / C(18-27) / D(<18)
+
+- **💰 融资分配策略**
+  - 甲组/乙组资金分配建议
+  - 融资倍数>100x时优先现金申购策略
+  - 资金锁定利息计算
   - 融资费用统计(99HKD/笔)
-  - 交易费用预估
-  - 净收益率计算
-
-- **🏭 行业赛道评分**
-  - 热门赛道识别(AI、新能源、半导体等)
-  - 行业龙头加分机制
-  - 行业增长前景评估
-  - PE合理性分析
+  - 预期收益和净收益率计算
 
 ### 🎨 特色功能
+
+- **📑 招股书PDF下载**
+  - 自动从披露易下载招股书
+  - 本地缓存管理
+  - 已截止招股自动清理
 
 - **🟢 绿鞋红鞋机制**
   - 绿鞋机制(超额配售权)识别
   - 红鞋机制(散户保护)计算
   - 一手党中签率估算
-  - 甲组/乙组分类
-
-- **📈 盈利能力评分**
-  - 净利润规模评估
-  - 营收增长率分析
-  - 亏损企业高增长识别
-  - 财务健康度评分
 
 - **🔒 风险控制**
   - 申购总额限制(本金×10)
   - 风险等级标识
   - 破发风险提示
-  - 热度等级分类
+  - 差异化估值：亏损企业不因亏损扣分，18C科创板/生物医药B类正常评分
+
+- **📰 网络信息补充**
+  - 自动搜索招股书以外的关键信息
+  - 商业模式深度分析
+  - 客户集中度、专利风险等识别
+  - 小红书讨论热度参考
 
 ---
 
@@ -128,13 +139,17 @@ npm run start:all
 
 | 接口 | 说明 |
 |------|------|
-| `GET /api/ipo-list` | 获取IPO列表（从AiPO、HKEX等数据源） |
+| `GET /api/ipo-list` | 获取申购中IPO列表（含评分） |
+| `GET /api/subscribe-list` | 获取申购中的新股（仅subscribe状态） |
+| `GET /api/ipo-all` | 获取分类IPO数据（申购中/即将上市/今日上市/近期上市） |
 | `GET /api/margin-data` | 获取孖展数据 |
-| `GET /api/subscription-data` | 获取申购数据 |
-| `GET /api/cached-data` | 获取缓存数据 |
+| `GET /prospectus/:file` | 获取本地缓存的招股书PDF |
+| `POST /api/prospectus/update` | 更新招股书（下载+清理） |
+| `GET /api/prospectus/list` | 获取已下载招股书列表 |
+| `POST /api/scoring/enrich` | 手动触发网络搜索补充评分数据 |
 | `GET /api/health` | 健康检查 |
 
-如果后端服务未启动，前端会自动降级到模拟数据。
+如果后端服务未启动，前端会使用IndexedDB缓存数据。
 
 ### 构建生产版本
 
@@ -205,20 +220,36 @@ npm run build
 stock-ipo-system/
 ├── src/
 │   ├── components/          # React组件
+│   │   ├── AIWorkflow.tsx            # AI深度分析工作流
 │   │   ├── CapitalManagement.tsx      # 资金管理
-│   │   ├── IPOList.tsx                # IPO列表
-│   │   ├── StrategyPlans.tsx          # 策略方案
-│   │   ├── RealTimeMarginData.tsx     # 实时数据
-│   │   └── AllocationStrategy.tsx     # 分配策略
+│   │   ├── DeepAnalysis.tsx          # 深度分析弹窗
+│   │   ├── IPOColumns.tsx            # IPO列表列定义
+│   │   ├── IPOList.tsx               # IPO列表主组件
+│   │   ├── IPOTabs.tsx               # IPO Tab配置
+│   │   ├── RealTimeMarginData.tsx    # 实时孖展数据
+│   │   └── StrategyPlans.tsx         # 策略方案
 │   ├── services/            # 业务服务
-│   │   ├── ipoService.ts              # IPO数据服务
-│   │   ├── strategyService.ts         # 策略计算服务
-│   │   └── realTimeDataService.ts     # 实时数据服务
+│   │   ├── hkIPOScoring.ts           # 港股IPO评分服务
+│   │   ├── ipoScoring.ts            # IPO评分服务
+│   │   ├── ipoService.ts            # IPO数据服务
+│   │   └── strategyService.ts        # 策略计算服务
 │   ├── types/               # TypeScript类型定义
 │   ├── db/                  # 数据库配置
 │   └── utils/               # 工具函数
+├── backend/
+│   ├── scraper/             # 爬虫模块
+│   │   ├── aastocks-scraper.js       # AASTOCKS孖展爬虫
+│   │   ├── etnet-scraper-fixed.js    # ETNet爬虫
+│   │   ├── hkex-prospectus-downloader.js  # 披露易招股书下载
+│   │   ├── hkexnews-scraper.js       # HKExNews爬虫
+│   │   ├── web-search-service.js     # 网络搜索补充服务
+│   │   └── prospectus-scraper.js     # 招股书数据
+│   ├── data/                # 静态数据
+│   │   ├── prospectus/      # 招股书PDF存储
+│   │   └── prospectus-data/ # 招股书元数据
+│   ├── server.js            # 后端服务入口
+│   └── dataProvider.js      # 数据提供器
 ├── docs/                    # 文档
-│   └── real-time-data-scraper.md      # 爬虫实现方案
 ├── AGENTS.md                # AI Agent规范
 ├── SKILL.md                 # Skill开发规范
 └── README.md                # 项目说明
@@ -226,44 +257,60 @@ stock-ipo-system/
 
 ### 核心算法
 
-**中签率计算模型**:
+**评分体系（100分制）**:
 ```typescript
-// 甲组(≤500万): 一手党保护机制
-oneHandPartyRate = min(1, totalLots × 0.7 / oneHandApplicants)
+总分 = 行业热度(35) + 保荐人(20) + 投资者(16) +
+      商业模式(10) + 估值(10) + 绿鞋(5) +
+      AH折价(2) + 盈利(2)
 
-// 综合中签率: 边际递减效应
-winRate = oneHandWinRate × log(subscriptionHands + 1) / log(2) × 孖展惩罚系数
+// 行业热度评分
+- AI/半导体/新能源等风口行业: 35分
+- 医疗器械/汽车电子等: 20分
+- 一般行业: 12分
+- 传统行业: 8分
 
-// 预期中签手数: 保底+概率
-expectedLots = expectedLotsFromRate × 0.7 + 保底机制 × 0.3
+// 保荐人评分
+- 中金/摩根/高盛等第一梯队: 20分
+- 海通/华泰/招商等第二梯队: 16分
+- 其他: 10分
+
+// 投资者背景评分
+- 基石投资者≥3家且有知名机构: 16分
+- 有基石但无知名机构: 9分
+- 无基石投资者: 0分
+
+// 等级划分
+- A+级: ≥80分 (顶级优质港股标的)
+- A级: 72-79分 (优质港股标的)
+- A-级: 65-71分 (良好港股标的)
+- B+级: 58-64分 (中上港股标的)
+- B级: 48-57分 (中等港股标的)
+- B-级: 38-47分 (中下港股标的)
+- C+/C/C-: 较差至高风险标的
+- D级: <18分 (高风险标的)
 ```
 
-**评分体系**:
-```typescript
-总分 = 基础分 × 30% +
-      保荐人分 × 20% +
-      行业赛道分 × 20% +
-      盈利能力分 × 20% +
-      龙头地位分 × 5% +
-      绿鞋机制分 × 5%
-```
+**差异化估值逻辑**:
+- 18C科创板(AI/新能源/半导体+亏损): 亏损不失分,正常18分
+- B类生物医药(亏损): 管线价值未体现,给18分
+- 传统行业大市值(家电/空调等>50亿): 市值评分降档
 
 ---
 
 ## 📊 数据来源
 
-### 当前使用
+### 实际数据源
 
-- **模拟数据**: 基于真实数据结构生成的演示数据
-- **本地存储**: IndexedDB本地数据库
+- **ETNet**: http://stocks.etnet.hk/ （实时行情、招股数据）
+- **AASTOCKS**: https://www.aastocks.com/ （孖展数据）
+- **HKExNews**: https://www1.hkexnews.hk/ （披露易招股书）
+- **静态JSON**: 本地完整新股数据文件
 
-### 生产环境(待实现)
+### 数据存储
 
-- **AiPO数据网**: https://aipo.myiqdii.com/
-- **AASTOCKS**: https://www.aastocks.com/
-- **ETNet**: http://stocks.etnet.hk/
-
-详细实现方案见: [docs/real-time-data-scraper.md](docs/real-time-data-scraper.md)
+- **IndexedDB**: 前端本地缓存（通过Dexie.js）
+- **招股书PDF**: 后端本地存储 `backend/data/prospectus/`
+- **评分缓存**: 后端本地存储 `backend/data/search-cache/`
 
 ---
 
