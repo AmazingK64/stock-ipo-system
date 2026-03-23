@@ -183,69 +183,53 @@ app.get('/api/subscribe-list', async (req, res) => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
-    // 从爬虫获取实时数据
-    const [etnetData, aastocksData] = await Promise.all([
-      Promise.race([
-        etnetScraper.scrapeAll(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('ETNet超时')), timeout))
-      ]).catch(err => {
-        console.warn('[API] ETNet获取失败:', err.message);
-        return null;
-      }),
-
-      Promise.race([
-        aastocksScraper.scrapeAll(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('AASTOCKS超时')), timeout))
-      ]).catch(err => {
-        console.warn('[API] AASTOCKS获取失败:', err.message);
-        return null;
-      })
-    ]);
-
-    let mergedData = mergeAndFilterIPOData(etnetData, aastocksData, null, now, today);
-
-    // 尝试用静态数据补充（覆盖孖展数据）
     const staticData = await dataProvider.getAllData();
+    let resultData = [];
+
     if (staticData && staticData.subscribeIPOs?.length > 0) {
-      // 检查爬虫数据是否为空或过期
-      const scrapedActive = mergedData.filter(ipo => ipo.status === 'subscribe');
       const staticActive = staticData.subscribeIPOs.filter(ipo => {
         if (!ipo.subscriptionEndDate) return true;
         return new Date(ipo.subscriptionEndDate) >= now;
       });
-
-      // 如果爬虫数据少，用静态数据补充孖展字段
-      if (scrapedActive.length === 0 && staticActive.length > 0) {
-        console.log('[API] 爬虫无数据，用静态数据补充（仅作孖展字段）');
-        mergedData = staticActive.map(ipo => ({ ...ipo, status: 'subscribe' }));
-      } else if (scrapedActive.length > 0) {
-        // 爬虫有数据，用静态孖展数据补充
-        const marginMap = new Map();
-        (staticData.subscribeIPOs || []).forEach(ipo => {
-          if (ipo.marginMultiple) {
-            marginMap.set(ipo.stockCode, ipo);
-          }
-        });
-        mergedData = mergedData.map(ipo => {
-          const staticIpo = marginMap.get(ipo.stockCode);
-          if (staticIpo && staticIpo.marginMultiple) {
-            return { ...ipo, marginMultiple: staticIpo.marginMultiple, marginAmount: staticIpo.marginAmount };
-          }
-          return ipo;
-        });
-      }
+      resultData = staticActive.map(ipo => ({ ...ipo, status: 'subscribe' }));
+      console.log(`[API] 静态数据: ${resultData.length} 条申购中`);
     }
 
-    // 只返回subscribe状态的
-    const subscribeData = mergedData.filter(ipo => ipo.status === 'subscribe');
+    console.log('[API] 从 AiPO 获取孖展数据...');
+    const marginData = await Promise.race([
+      aipoScraper.scrapeMarginData(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('孖展数据超时')), timeout))
+    ]).catch(err => {
+      console.warn('[API] AiPO孖展数据获取失败:', err.message);
+      return [];
+    });
 
-    console.log(`[API] 申购中数据: 共 ${subscribeData.length} 条`);
+    if (marginData && marginData.length > 0) {
+      const marginMap = new Map();
+      marginData.forEach(m => marginMap.set(m.stockCode, m));
+
+      resultData = resultData.map(ipo => {
+        const margin = marginMap.get(ipo.stockCode);
+        if (margin) {
+          return {
+            ...ipo,
+            marginMultiple: margin.marginMultiple,
+            marginAmount: margin.marginAmount
+          };
+        }
+        return ipo;
+      });
+
+      console.log(`[API] AiPO孖展数据合并: ${marginData.length} 条`);
+    }
+
+    console.log(`[API] 申购中数据: 共 ${resultData.length} 条`);
 
     res.json({
       success: true,
-      data: subscribeData,
+      data: resultData,
       lastUpdate: new Date().toISOString(),
-      source: 'scraper'
+      source: 'static'
     });
   } catch (error) {
     console.error('[API] 获取申购中数据失败:', error);
@@ -258,13 +242,12 @@ app.get('/api/subscribe-list', async (req, res) => {
 
 // 获取孖展数据
 app.get('/api/margin-data', async (req, res) => {
-  const timeout = 15000;
+  const timeout = 30000;
   try {
     console.log('[API] 获取孖展数据...');
 
-    // 获取所有孖展数据
     const marginData = await Promise.race([
-      aastocksScraper.scrapeMarginData(),
+      aipoScraper.scrapeMarginData(),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('孖展数据请求超时')), timeout)
       )
@@ -273,18 +256,15 @@ app.get('/api/margin-data', async (req, res) => {
       return [];
     });
 
-    // 获取当前时间
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     console.log(`[API] 当前时间: ${now.toISOString()}, 今天: ${today}`);
 
-    // 获取申购中的股票代码列表(从静态数据中获取)
     const staticData = await dataProvider.getAllData();
     const subscribeStockCodes = new Set(
       (staticData?.subscribeIPOs || []).map(ipo => ipo.stockCode)
     );
 
-    // 获取所有股票的申购截止日期信息
     const allIPOs = [
       ...(staticData?.subscribeIPOs || []),
       ...(staticData?.upcomingIPOs || [])
